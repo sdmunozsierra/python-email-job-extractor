@@ -18,7 +18,7 @@ class ProjectBuilder:
     def with_duration(self, duration):
         self.duration = duration
         return self
-    
+
     def with_team_size(self, team_size):
         self.team_size = team_size
         return self

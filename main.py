@@ -5,6 +5,7 @@ from experiece_builder import ExperienceFactory
 from project_builder import ProjectBuilder
 from project_builder import ProjectFactory
 from cert_builder import CertFactory
+from format_experience import format_experience, format_experience_skills
 
 
 
@@ -132,7 +133,7 @@ cp1 = ProjectFactory.create_project(
         "UI/UX design with interactive wireframing into fullstrack js integrations.",
         "Continuous Delivery from hot-commit to global within 3 minutes.",
         "Smart contracts with tets to deploy into Infura or private Ethereum cloud nodes.",
-        "Client facing on cutting edge technologies."
+        "Client facing on cutting edge technologies.",
         "Web3 technology vision, strategy and direction."],
     ["aws-amplify", "aws-dynamo", "aws-s3", "aws-route53", "aws-vpc", "graphql", "ava", "adobe-xd", "nuxt", "solidity"]
 )
@@ -147,7 +148,7 @@ leidos_experience = ExperienceFactory.create_experience(
 
 cleta_experience = ExperienceFactory.create_experience(
     "Founder",
-    "Cleta LLC.",
+    "Cleta LLC",
     "August 2020 - Present",
     "Arlington, VA",
     [cp1]
@@ -170,7 +171,7 @@ sergio_builder = PersonBuilder()\
                 "python2", "python3", "python-scrapy", "python-flask", "python-pandas",
                 "spring-boot", "spring-security", "spring-profiles", "spring-data",
                 "bash", "kafka", "vim", "yarn","solidity",
-                "html", "css", "php",
+                "html", "css", "php", "jinja",
                 "git", "github-actions", "gitlab-cicd",
                 "aws-amplify", "aws-iam", "aws-serverless", "aws-vpc", "aws-codepipeline", "aws-cloudformation",
                 "ansible", "consul", "kubernetes-training",
@@ -203,14 +204,24 @@ def build_resume(person):
 
     # Add a section for experience
     doc.add_heading("Experience", level=2)
-    for experience_item in person.experience:
-        doc.add_paragraph(str(experience_item))
+    format_experience(doc, person.experience)
+    #for experience_item in person.experience:
+        #doc.add_paragraph(str(experience_item))
 
     # Add a section for skills
     doc.add_heading("Skills", level=2)
+    doc.add_heading("Experience Skills", level=3)
+    format_experience_skills(doc, person.experience)
+
+    doc.add_heading("Related Skills", level=3)
+    p = doc.add_paragraph()
     for skill in person.skills:
-        doc.add
-        doc.add_paragraph(skill)
+        p.add_run(f"{skill}, ")
+
+    # Add a section for activities
+    doc.add_heading("Activities", level=2)
+    for activity in person.activities:
+        doc.add_paragraph(activity)
 
     # Add a section for certs
     doc.add_heading("Certs", level=2)
