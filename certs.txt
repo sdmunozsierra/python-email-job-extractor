@@ -55,4 +55,6 @@ April 2022
 Google Cloud Digital Leader
 Google
 May 2022
-
+Design Patterns in Python
+Udemy
+Feb 2023

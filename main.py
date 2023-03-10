@@ -180,12 +180,12 @@ certs = CertFactory.from_file("certs.txt")
 for cert in certs:
     print(cert)
 
+    #.add_experience(cleta_experience)\
+    #.add_education(utep_education) \
 sergio_builder = PersonBuilder()\
     .add_experience(pubnub_experience)\
-    .add_experience(cleta_experience)\
     .add_experience(infinitive_experience)\
     .add_experience(leidos_experience) \
-    .add_education(utep_education) \
     .set_skills(
         ["postman", "REST", "sonarqube", "swagger-api",
                 "aws-aurora","mongo-db", "graphql", "redis", "sql",
@@ -229,11 +229,9 @@ def build_resume(person):
     doc.add_paragraph()
 
     # Add a section for education
-    doc.add_heading("Education", level=2)
-    format_education(doc, person.education)
-    #for education_item in person.education:
-        #doc.add_paragraph(education_item)
-    doc.add_paragraph()
+    #doc.add_heading("Education", level=2)
+    #format_education(doc, person.education)
+    #doc.add_paragraph()
 
     # Add a section for skills
     doc.add_heading("Skills", level=2)
@@ -270,11 +268,11 @@ def build_resume(person):
         row_cells[2].text = cert.completion_date
 
     # Iterate through all styles and set their font to the new default font
-    for style in doc.styles:
-        if style.type == WD_STYLE_TYPE.PARAGRAPH:
-            font = style.font
-            font.name = 'Arial'
-            font.size = Pt(12)
+    #for style in doc.styles:
+        #if style.type == WD_STYLE_TYPE.PARAGRAPH:
+            #font = style.font
+            #font.name = 'Arial'
+            #font.size = Pt(12)
     return doc
 
 # Example usage
