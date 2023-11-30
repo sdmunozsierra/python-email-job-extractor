@@ -1,6 +1,6 @@
 """Personal Information for Sergio David Munoz Sierra"""
-from ..experiece_builder import ExperienceFactory
-from ..project_builder import ProjectFactory
+from src.experiece_builder import ExperienceFactory
+from src.project_builder import ProjectFactory
 
 # Experience in Reverse Chronological Order
 
@@ -15,6 +15,7 @@ job0_project0 = ProjectFactory.create_project(
      "Logged and maintained records of different parts and components of cameras.",
      "Provided customer service by offering services and products by phone."],
     ["hardware-testing", "visual-inspection", "customer-service"]
+)
 
 job0 = ExperienceFactory.create_experience(
     "Inventory Tester",
@@ -36,6 +37,7 @@ job1_project0 = ProjectFactory.create_project(
      "Reviewed customer forms, received payments, and keep in contact to provide best service.",
      "Expertise in cold calling, sales, and customer service."],
     ["cold-calling", "sales", "customer-service"]
+)
 
 job1 = ExperienceFactory.create_experience(
     "Management Excellence Program",
@@ -92,6 +94,7 @@ job3_project0 = ProjectFactory.create_project(
      "Created a rigorous testing methodology to eliminate errors on insurance questionnaires",
      "Achieved acceptance of files within 48 hours of submission which used to take weeks or months."],
     ["java", "sql", "automation", "testing", "consulting-it", "etl", "qa"]
+)
 
 job3 = ExperienceFactory.create_experience(
     "IT Consultant",
@@ -111,7 +114,7 @@ job4_project0 = ProjectFactory.create_project(
     ["Updated and maintained Linux Kernel low level code on any BlueZ compatible devices.",
      "Prototyped a Bluetooth mesh using 4 RaspberryPi devices to track and locate users via Bluetooth packets."],
     ["iot", "c lang", "bluetooth", "linux", "kernel", "android", "java"]
-
+)
 
 job4_project1 = ProjectFactory.create_project(
     "mlnOpedia Mobile App",
@@ -122,6 +125,7 @@ job4_project1 = ProjectFactory.create_project(
      "Added push notifications to alert users on recommendations and updates.",
      "Implemented bulk upload scripts to automate safe data upload to local and remote servers."],
     ["android", "java", "ios", "objective c", "python", "automation", "push-notifications"]
+)
 
 job4_project2 = ProjectFactory.create_project(
     "AWS EC2 Metrics Analytics",
@@ -254,7 +258,7 @@ job6 = ExperienceFactory.create_experience(
     "PubNub",
     "06/2022 - 10/2023",
     "San Francisco, CA / Remote",
-    [job0_project0, job0_project1, job0_project2, job0_project3]
+    [job6_project0, job6_project1, job6_project2, job6_project3]
 )
 
 
