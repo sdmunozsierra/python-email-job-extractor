@@ -392,8 +392,8 @@ class ResumeMatcher:
             parts.append("\nEducation:")
             for edu in resume.education:
                 edu_line = f"- {edu.degree}"
-                if edu.field:
-                    edu_line += f" in {edu.field}"
+                if edu.field_of_study:
+                    edu_line += f" in {edu.field_of_study}"
                 edu_line += f" from {edu.institution}"
                 if edu.end_date:
                     edu_line += f" ({edu.end_date})"

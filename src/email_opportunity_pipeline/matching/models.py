@@ -126,7 +126,7 @@ class Education:
     """Represents an education entry."""
     degree: str
     institution: str
-    field: Optional[str] = None
+    field_of_study: Optional[str] = None
     location: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -137,7 +137,7 @@ class Education:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "degree": self.degree,
-            "field": self.field,
+            "field": self.field_of_study,
             "institution": self.institution,
             "location": self.location,
             "start_date": self.start_date,
@@ -152,7 +152,7 @@ class Education:
         return cls(
             degree=data.get("degree", ""),
             institution=data.get("institution", ""),
-            field=data.get("field"),
+            field_of_study=data.get("field"),
             location=data.get("location"),
             start_date=data.get("start_date"),
             end_date=data.get("end_date"),
