@@ -44,18 +44,18 @@ examples/
   filter_rules.json
 ```
 
-## Install
+## Install (uv)
 
 ```
-python -m venv .venv
+uv venv
 source .venv/bin/activate
-pip install -e .
+uv pip install -e .
 ```
 
 Optional LLM support (OpenAI):
 
 ```
-pip install -e ".[llm]"
+uv pip install -e ".[llm]"
 ```
 
 ## Gmail setup
