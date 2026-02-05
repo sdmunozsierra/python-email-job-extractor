@@ -382,9 +382,13 @@ def generate_report(analytics: PipelineAnalytics) -> str:
     lines.append("                         EXECUTIVE SUMMARY")
     lines.append("-" * 70)
     lines.append("")
-    lines.append(f"  Total Emails Processed:     {analytics.total_emails_filtered:,}")
-    lines.append(f"  Emails Passed Filter:       {analytics.emails_passed_filter:,} ({analytics.filter_pass_rate:.1f}%)")
-    lines.append(f"  Emails Failed Filter:       {analytics.emails_failed_filter:,} ({analytics.filter_fail_rate:.1f}%)")
+    lines.append(f"  Total Emails Fetched:       {analytics.total_emails_fetched:,}")
+    if analytics.total_emails_filtered > 0:
+        lines.append(f"  Total Emails Filtered:      {analytics.total_emails_filtered:,}")
+        lines.append(f"  Emails Passed Filter:       {analytics.emails_passed_filter:,} ({analytics.filter_pass_rate:.1f}%)")
+        lines.append(f"  Emails Failed Filter:       {analytics.emails_failed_filter:,} ({analytics.filter_fail_rate:.1f}%)")
+    else:
+        lines.append(f"  Total Emails Filtered:      (no filter data)")
     lines.append(f"  Opportunities Extracted:    {analytics.total_opportunities_extracted:,}")
     lines.append("")
     

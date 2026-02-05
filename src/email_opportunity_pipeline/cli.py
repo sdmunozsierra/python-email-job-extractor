@@ -149,23 +149,24 @@ def _cmd_analytics(args: argparse.Namespace) -> None:
     analytics = PipelineAnalytics()
     analytics.start()
     
-    # Load and analyze messages
+    messages = []
+    
+    # Load messages
     if args.messages:
         messages = list(read_messages(args.messages))
         for msg in messages:
             analytics.record_email_fetch(msg)
         print(f"Loaded {len(messages)} messages from {args.messages}")
     
-    # Load and analyze filtered results (if we have both messages and filtered)
-    if args.messages and args.filtered:
-        messages = list(read_messages(args.messages))
-        filtered_messages = {m.message_id for m in read_messages(args.filtered)}
-        
-        pipeline = build_filter_pipeline(rules_path=args.rules)
+    # Run filter analysis on messages (always run if we have messages)
+    if messages:
+        pipeline = build_filter_pipeline(rules_path=args.rules if args.rules else None)
         results = filter_messages_with_outcomes(pipeline, messages)
         
         for msg, outcome in results:
             analytics.record_filter_result(msg, outcome)
+        
+        print(f"Filtered {len(messages)} messages")
     
     # Load and analyze opportunities
     if args.opportunities:
