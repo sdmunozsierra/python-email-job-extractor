@@ -158,3 +158,44 @@ Filter and rank previously computed match results.
 email-pipeline rank --in out/matches/match_results.json --min-score 70 --top 10
 ```
 
+### Resume tailoring
+
+This command requires the `resume-builder` subtree package (installed
+automatically via `uv sync`).
+
+#### `tailor`
+
+Tailor a resume for one or more job opportunities using match results. Generates
+tailored `.docx` files and detailed change reports.
+
+```bash
+email-pipeline tailor \
+  --resume examples/sample_resume.json \
+  --match-results out/matches/match_results.json \
+  --opportunities data/opportunities.json \
+  --out output/tailored
+```
+
+Options:
+
+- `--resume`: path to the original resume file (JSON or Markdown)
+- `--match-results`: path to match results JSON (output of `match` command)
+- `--opportunities`: path to opportunities JSON (for job context in reports)
+- `--out`: output directory for tailored resumes, reports, and `.docx` files
+- `--min-score`: only tailor for jobs above this match score
+- `--recommendation`: comma-separated recommendations to filter (e.g. `strong_apply,apply`)
+- `--top`: limit to top N results by score
+- `--no-docx`: skip `.docx` generation (JSON/Markdown reports only)
+
+**Outputs per job:**
+
+- `<job_id>_resume.json` -- the tailored resume data
+- `<job_id>_report.json` -- structured tailoring report
+- `<job_id>_report.md` -- human-readable Markdown change report
+- `tailored_resume_<company>_<title>.docx` -- the generated Word document
+
+**Batch outputs:**
+
+- `tailoring_results.json` -- all tailoring results in one file
+- `tailoring_summary.md` -- summary across all tailored resumes
+
