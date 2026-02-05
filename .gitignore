@@ -160,3 +160,9 @@ cython_debug/
 #.idea/
 
 .vscode/
+
+# Generated resume documents
+resume.docx
+resume_*.docx
+*.docx
+!alternating_timeline_cv.docx
