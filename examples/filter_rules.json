@@ -15,24 +15,61 @@
   "non_job_domains": [
     "e.allegiant.com",
     "email.meetup.com",
-    "announcements.soundcloud.com"
+    "announcements.soundcloud.com",
+    "email.chime.com",
+    "e.chime.com",
+    "e.fidelity.com",
+    "mail.fidelity.com",
+    "info.papajohns.com",
+    "e.papajohns.com",
+    "zzounds.com",
+    "em.zzounds.com",
+    "team.twilio.com",
+    "marketing.twilio.com"
   ],
   "job_keywords": [
     "recruiter",
+    "recruiting",
+    "talent acquisition",
+    "sourcer",
+    "are you open to",
+    "are you interested",
+    "would you be interested",
+    "job description",
+    "offer letter",
+    "base salary",
+    "equity",
+    "rsu",
+    "background check",
+    "candidacy",
+    "resume",
+    "cv",
+    "phone screen",
+    "coding challenge",
+    "technical screen",
+    "onsite",
+    "final round",
+    "internship",
+    "job alert",
+    "your application",
+    "thank you for applying"
+  ],
+  "weak_job_keywords": [
     "opportunity",
     "role",
     "position",
-    "interview",
+    "opening",
     "offer",
     "compensation",
-    "application",
-    "resume",
-    "technical screen",
-    "coding challenge",
-    "internship"
+    "bonus",
+    "benefits",
+    "interview",
+    "assessment",
+    "next steps"
   ],
   "role_title_patterns": [
     "\\bsoftware engineer\\b",
+    "\\bdeveloper\\b",
     "\\bdata scientist\\b",
     "\\bproduct manager\\b",
     "\\bdevops\\b",
@@ -42,7 +79,13 @@
     "\\bpromo code\\b",
     "\\bdiscount\\b",
     "\\bnewsletter\\b",
-    "\\bunsubscribe\\b"
+    "\\bunsubscribe\\b",
+    "\\bshop now\\b",
+    "\\bbuy now\\b",
+    "\\blimited time\\b",
+    "\\b\\d+% off\\b",
+    "\\brefer a friend\\b",
+    "\\breferral bonus\\b"
   ],
   "edu_negative_patterns": [
     "\\badmissions?\\b",
@@ -53,7 +96,11 @@
     "\\bphone screen\\b",
     "\\boffer letter\\b",
     "\\bbackground check\\b",
-    "\\bcompensation\\b"
+    "\\bcompensation\\b",
+    "\\brecruit(er|ing)\\b",
+    "\\btalent acquisition\\b",
+    "\\bhiring manager\\b",
+    "\\bjob opportunity\\b"
   ],
   "interview_context_patterns": [
     "\\binterview\\b",
@@ -62,5 +109,45 @@
   ],
   "oa_assessment_patterns": [
     "\\b(online assessment|assessment|coding challenge|take[- ]home|codesignal|codility)\\b"
+  ],
+  "promotional_sender_patterns": [
+    "^noreply@",
+    "^no-reply@",
+    "^marketing@",
+    "^promo@",
+    "^newsletter@",
+    "^info@",
+    "^support@",
+    "^team@",
+    "^notifications?@",
+    "^alerts?@"
+  ],
+  "commercial_domain_patterns": [
+    "^e\\.",
+    "^em\\.",
+    "^email\\.",
+    "^mail\\.",
+    "^marketing\\.",
+    "^promo\\.",
+    "^newsletter\\.",
+    "^info\\.",
+    "^team\\.",
+    "^noreply\\."
+  ],
+  "transactional_patterns": [
+    "\\byour order\\b",
+    "\\border #\\d+\\b",
+    "\\breceipt\\b",
+    "\\binvoice\\b",
+    "\\bshipped\\b",
+    "\\btracking number\\b",
+    "\\breset your password\\b",
+    "\\bverification code\\b"
+  ],
+  "marketing_footer_patterns": [
+    "you('re| are) receiving this (email|message) because",
+    "click here to unsubscribe",
+    "manage (your )?preferences",
+    "privacy policy"
   ]
 }
