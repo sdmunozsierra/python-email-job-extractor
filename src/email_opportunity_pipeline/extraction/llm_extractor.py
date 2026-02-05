@@ -7,6 +7,8 @@ from ..models import EmailMessage
 from .extractor import BaseExtractor
 from .schema import JOB_SCHEMA
 
+# Schema name for OpenAI API
+JOB_SCHEMA_NAME = "job_opportunity"
 
 SYSTEM_INSTRUCTIONS = (
     "Extract job opportunity data from recruiter/job emails into the provided JSON schema. "
@@ -43,6 +45,12 @@ class LLMExtractor(BaseExtractor):
                 {"role": "system", "content": SYSTEM_INSTRUCTIONS},
                 {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
             ],
-            text={"format": {"type": "json_schema", "json_schema": JOB_SCHEMA}},
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": JOB_SCHEMA_NAME,
+                    "schema": JOB_SCHEMA,
+                }
+            },
         )
         return json.loads(response.output_text)
