@@ -7,118 +7,117 @@ import json
 from typing import Any, Dict, List, Optional
 
 
+# Schema name for OpenAI API
+JOB_ANALYSIS_SCHEMA_NAME = "job_analysis"
+
 # Schema for structured job analysis output
 JOB_ANALYSIS_SCHEMA = {
-    "name": "job_analysis",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "role_summary": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "title": {"type": ["string", "null"]},
-                    "level": {"type": ["string", "null"], "description": "entry, mid, senior, staff, principal, lead, manager, director, vp, c-level"},
-                    "department": {"type": ["string", "null"]},
-                    "team_size": {"type": ["string", "null"]},
-                    "reports_to": {"type": ["string", "null"]},
-                },
-                "required": ["title", "level", "department", "team_size", "reports_to"],
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "role_summary": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": ["string", "null"]},
+                "level": {"type": ["string", "null"], "description": "entry, mid, senior, staff, principal, lead, manager, director, vp, c-level"},
+                "department": {"type": ["string", "null"]},
+                "team_size": {"type": ["string", "null"]},
+                "reports_to": {"type": ["string", "null"]},
             },
-            "requirements": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "years_experience_min": {"type": ["number", "null"]},
-                    "years_experience_max": {"type": ["number", "null"]},
-                    "education_required": {"type": ["string", "null"], "description": "minimum education level"},
-                    "education_preferred": {"type": ["string", "null"]},
-                    "mandatory_skills": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Skills explicitly required or must-have",
-                    },
-                    "preferred_skills": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Nice-to-have skills",
-                    },
-                    "certifications_required": {"type": "array", "items": {"type": "string"}},
-                    "certifications_preferred": {"type": "array", "items": {"type": "string"}},
-                    "security_clearance": {"type": ["string", "null"]},
-                    "other_requirements": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": [
-                    "years_experience_min", "years_experience_max", "education_required",
-                    "education_preferred", "mandatory_skills", "preferred_skills",
-                    "certifications_required", "certifications_preferred",
-                    "security_clearance", "other_requirements"
-                ],
-            },
-            "responsibilities": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Key job responsibilities",
-            },
-            "technical_environment": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "languages": {"type": "array", "items": {"type": "string"}},
-                    "frameworks": {"type": "array", "items": {"type": "string"}},
-                    "databases": {"type": "array", "items": {"type": "string"}},
-                    "cloud_platforms": {"type": "array", "items": {"type": "string"}},
-                    "tools": {"type": "array", "items": {"type": "string"}},
-                    "methodologies": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["languages", "frameworks", "databases", "cloud_platforms", "tools", "methodologies"],
-            },
-            "culture_indicators": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "work_style": {"type": ["string", "null"], "description": "collaborative, autonomous, fast-paced, etc."},
-                    "values_mentioned": {"type": "array", "items": {"type": "string"}},
-                    "growth_opportunities": {"type": "array", "items": {"type": "string"}},
-                    "red_flags": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["work_style", "values_mentioned", "growth_opportunities", "red_flags"],
-            },
-            "compensation_analysis": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "salary_competitive": {"type": ["string", "null"], "description": "assessment: below_market, market, above_market, unknown"},
-                    "benefits_quality": {"type": ["string", "null"], "description": "poor, average, good, excellent, unknown"},
-                    "equity_offered": {"type": ["boolean", "null"]},
-                    "notes": {"type": ["string", "null"]},
-                },
-                "required": ["salary_competitive", "benefits_quality", "equity_offered", "notes"],
-            },
-            "keywords": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Important keywords for ATS optimization",
-            },
-            "role_classification": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "primary_domain": {"type": ["string", "null"], "description": "backend, frontend, fullstack, data, devops, ml, mobile, security, etc."},
-                    "industry": {"type": ["string", "null"]},
-                    "company_stage": {"type": ["string", "null"], "description": "startup, scaleup, enterprise, agency, consulting"},
-                },
-                "required": ["primary_domain", "industry", "company_stage"],
-            },
+            "required": ["title", "level", "department", "team_size", "reports_to"],
         },
-        "required": [
-            "role_summary", "requirements", "responsibilities",
-            "technical_environment", "culture_indicators",
-            "compensation_analysis", "keywords", "role_classification"
-        ],
+        "requirements": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "years_experience_min": {"type": ["number", "null"]},
+                "years_experience_max": {"type": ["number", "null"]},
+                "education_required": {"type": ["string", "null"], "description": "minimum education level"},
+                "education_preferred": {"type": ["string", "null"]},
+                "mandatory_skills": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Skills explicitly required or must-have",
+                },
+                "preferred_skills": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Nice-to-have skills",
+                },
+                "certifications_required": {"type": "array", "items": {"type": "string"}},
+                "certifications_preferred": {"type": "array", "items": {"type": "string"}},
+                "security_clearance": {"type": ["string", "null"]},
+                "other_requirements": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": [
+                "years_experience_min", "years_experience_max", "education_required",
+                "education_preferred", "mandatory_skills", "preferred_skills",
+                "certifications_required", "certifications_preferred",
+                "security_clearance", "other_requirements"
+            ],
+        },
+        "responsibilities": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Key job responsibilities",
+        },
+        "technical_environment": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "languages": {"type": "array", "items": {"type": "string"}},
+                "frameworks": {"type": "array", "items": {"type": "string"}},
+                "databases": {"type": "array", "items": {"type": "string"}},
+                "cloud_platforms": {"type": "array", "items": {"type": "string"}},
+                "tools": {"type": "array", "items": {"type": "string"}},
+                "methodologies": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["languages", "frameworks", "databases", "cloud_platforms", "tools", "methodologies"],
+        },
+        "culture_indicators": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "work_style": {"type": ["string", "null"], "description": "collaborative, autonomous, fast-paced, etc."},
+                "values_mentioned": {"type": "array", "items": {"type": "string"}},
+                "growth_opportunities": {"type": "array", "items": {"type": "string"}},
+                "red_flags": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["work_style", "values_mentioned", "growth_opportunities", "red_flags"],
+        },
+        "compensation_analysis": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "salary_competitive": {"type": ["string", "null"], "description": "assessment: below_market, market, above_market, unknown"},
+                "benefits_quality": {"type": ["string", "null"], "description": "poor, average, good, excellent, unknown"},
+                "equity_offered": {"type": ["boolean", "null"]},
+                "notes": {"type": ["string", "null"]},
+            },
+            "required": ["salary_competitive", "benefits_quality", "equity_offered", "notes"],
+        },
+        "keywords": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Important keywords for ATS optimization",
+        },
+        "role_classification": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "primary_domain": {"type": ["string", "null"], "description": "backend, frontend, fullstack, data, devops, ml, mobile, security, etc."},
+                "industry": {"type": ["string", "null"]},
+                "company_stage": {"type": ["string", "null"], "description": "startup, scaleup, enterprise, agency, consulting"},
+            },
+            "required": ["primary_domain", "industry", "company_stage"],
+        },
     },
+    "required": [
+        "role_summary", "requirements", "responsibilities",
+        "technical_environment", "culture_indicators",
+        "compensation_analysis", "keywords", "role_classification"
+    ],
 }
 
 
@@ -177,7 +176,13 @@ class JobAnalyzer:
                 {"role": "system", "content": ANALYZER_SYSTEM_PROMPT},
                 {"role": "user", "content": f"Analyze this job opportunity:\n\n{job_context}"},
             ],
-            text={"format": {"type": "json_schema", "json_schema": JOB_ANALYSIS_SCHEMA}},
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": JOB_ANALYSIS_SCHEMA_NAME,
+                    "schema": JOB_ANALYSIS_SCHEMA,
+                }
+            },
         )
         
         try:

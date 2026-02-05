@@ -19,166 +19,165 @@ from .models import (
 )
 
 
+# Schema name for OpenAI API
+MATCH_ANALYSIS_SCHEMA_NAME = "match_analysis"
+
 # Schema for LLM match analysis output
 MATCH_ANALYSIS_SCHEMA = {
-    "name": "match_analysis",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "overall_score": {
-                "type": "number",
-                "description": "Overall match score 0-100",
-            },
-            "match_grade": {
-                "type": "string",
-                "enum": ["excellent", "good", "fair", "poor", "unqualified"],
-            },
-            "recommendation": {
-                "type": "string",
-                "enum": ["strong_apply", "apply", "consider", "skip", "not_recommended"],
-            },
-            "skills_analysis": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "score": {"type": "number"},
-                    "matched_mandatory": {"type": "array", "items": {"type": "string"}},
-                    "missing_mandatory": {"type": "array", "items": {"type": "string"}},
-                    "matched_preferred": {"type": "array", "items": {"type": "string"}},
-                    "missing_preferred": {"type": "array", "items": {"type": "string"}},
-                    "bonus_skills": {"type": "array", "items": {"type": "string"}},
-                    "transferable_skills": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": [
-                    "score", "matched_mandatory", "missing_mandatory",
-                    "matched_preferred", "missing_preferred",
-                    "bonus_skills", "transferable_skills"
-                ],
-            },
-            "experience_analysis": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "score": {"type": "number"},
-                    "years_gap": {"type": ["number", "null"]},
-                    "role_relevance": {"type": "string", "enum": ["high", "medium", "low", "none"]},
-                    "relevant_positions": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "properties": {
-                                "title": {"type": "string"},
-                                "company": {"type": "string"},
-                                "relevance": {"type": "string", "enum": ["high", "medium", "low"]},
-                                "key_achievements": {"type": "array", "items": {"type": "string"}},
-                            },
-                            "required": ["title", "company", "relevance", "key_achievements"],
-                        },
-                    },
-                    "experience_gaps": {"type": "array", "items": {"type": "string"}},
-                    "career_progression_notes": {"type": ["string", "null"]},
-                },
-                "required": [
-                    "score", "years_gap", "role_relevance",
-                    "relevant_positions", "experience_gaps", "career_progression_notes"
-                ],
-            },
-            "education_analysis": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "score": {"type": "number"},
-                    "meets_requirements": {"type": "boolean"},
-                    "notes": {"type": ["string", "null"]},
-                },
-                "required": ["score", "meets_requirements", "notes"],
-            },
-            "location_analysis": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "score": {"type": "number"},
-                    "compatible": {"type": "boolean"},
-                    "notes": {"type": ["string", "null"]},
-                },
-                "required": ["score", "compatible", "notes"],
-            },
-            "culture_fit": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "score": {"type": "number"},
-                    "notes": {"type": ["string", "null"]},
-                },
-                "required": ["score", "notes"],
-            },
-            "insights": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "strengths": {"type": "array", "items": {"type": "string"}},
-                    "concerns": {"type": "array", "items": {"type": "string"}},
-                    "opportunities": {"type": "array", "items": {"type": "string"}},
-                    "talking_points": {"type": "array", "items": {"type": "string"}},
-                    "questions_to_ask": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["strengths", "concerns", "opportunities", "talking_points", "questions_to_ask"],
-            },
-            "resume_tailoring": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "keywords_to_add": {"type": "array", "items": {"type": "string"}},
-                    "skills_to_highlight": {"type": "array", "items": {"type": "string"}},
-                    "experience_to_emphasize": {"type": "array", "items": {"type": "string"}},
-                    "achievements_to_feature": {"type": "array", "items": {"type": "string"}},
-                    "summary_suggestions": {"type": ["string", "null"]},
-                },
-                "required": [
-                    "keywords_to_add", "skills_to_highlight",
-                    "experience_to_emphasize", "achievements_to_feature",
-                    "summary_suggestions"
-                ],
-            },
-            "application_strategy": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "approach": {
-                        "type": "string",
-                        "enum": ["direct_apply", "referral_preferred", "recruiter_contact", "networking_first"],
-                    },
-                    "urgency": {
-                        "type": "string",
-                        "enum": ["immediate", "soon", "when_ready", "low_priority"],
-                    },
-                    "cover_letter_focus": {"type": "array", "items": {"type": "string"}},
-                    "potential_objections": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "properties": {
-                                "objection": {"type": "string"},
-                                "counter": {"type": "string"},
-                            },
-                            "required": ["objection", "counter"],
-                        },
-                    },
-                },
-                "required": ["approach", "urgency", "cover_letter_focus", "potential_objections"],
-            },
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "overall_score": {
+            "type": "number",
+            "description": "Overall match score 0-100",
         },
-        "required": [
-            "overall_score", "match_grade", "recommendation",
-            "skills_analysis", "experience_analysis", "education_analysis",
-            "location_analysis", "culture_fit", "insights",
-            "resume_tailoring", "application_strategy"
-        ],
+        "match_grade": {
+            "type": "string",
+            "enum": ["excellent", "good", "fair", "poor", "unqualified"],
+        },
+        "recommendation": {
+            "type": "string",
+            "enum": ["strong_apply", "apply", "consider", "skip", "not_recommended"],
+        },
+        "skills_analysis": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "score": {"type": "number"},
+                "matched_mandatory": {"type": "array", "items": {"type": "string"}},
+                "missing_mandatory": {"type": "array", "items": {"type": "string"}},
+                "matched_preferred": {"type": "array", "items": {"type": "string"}},
+                "missing_preferred": {"type": "array", "items": {"type": "string"}},
+                "bonus_skills": {"type": "array", "items": {"type": "string"}},
+                "transferable_skills": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": [
+                "score", "matched_mandatory", "missing_mandatory",
+                "matched_preferred", "missing_preferred",
+                "bonus_skills", "transferable_skills"
+            ],
+        },
+        "experience_analysis": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "score": {"type": "number"},
+                "years_gap": {"type": ["number", "null"]},
+                "role_relevance": {"type": "string", "enum": ["high", "medium", "low", "none"]},
+                "relevant_positions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "title": {"type": "string"},
+                            "company": {"type": "string"},
+                            "relevance": {"type": "string", "enum": ["high", "medium", "low"]},
+                            "key_achievements": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["title", "company", "relevance", "key_achievements"],
+                    },
+                },
+                "experience_gaps": {"type": "array", "items": {"type": "string"}},
+                "career_progression_notes": {"type": ["string", "null"]},
+            },
+            "required": [
+                "score", "years_gap", "role_relevance",
+                "relevant_positions", "experience_gaps", "career_progression_notes"
+            ],
+        },
+        "education_analysis": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "score": {"type": "number"},
+                "meets_requirements": {"type": "boolean"},
+                "notes": {"type": ["string", "null"]},
+            },
+            "required": ["score", "meets_requirements", "notes"],
+        },
+        "location_analysis": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "score": {"type": "number"},
+                "compatible": {"type": "boolean"},
+                "notes": {"type": ["string", "null"]},
+            },
+            "required": ["score", "compatible", "notes"],
+        },
+        "culture_fit": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "score": {"type": "number"},
+                "notes": {"type": ["string", "null"]},
+            },
+            "required": ["score", "notes"],
+        },
+        "insights": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "strengths": {"type": "array", "items": {"type": "string"}},
+                "concerns": {"type": "array", "items": {"type": "string"}},
+                "opportunities": {"type": "array", "items": {"type": "string"}},
+                "talking_points": {"type": "array", "items": {"type": "string"}},
+                "questions_to_ask": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["strengths", "concerns", "opportunities", "talking_points", "questions_to_ask"],
+        },
+        "resume_tailoring": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "keywords_to_add": {"type": "array", "items": {"type": "string"}},
+                "skills_to_highlight": {"type": "array", "items": {"type": "string"}},
+                "experience_to_emphasize": {"type": "array", "items": {"type": "string"}},
+                "achievements_to_feature": {"type": "array", "items": {"type": "string"}},
+                "summary_suggestions": {"type": ["string", "null"]},
+            },
+            "required": [
+                "keywords_to_add", "skills_to_highlight",
+                "experience_to_emphasize", "achievements_to_feature",
+                "summary_suggestions"
+            ],
+        },
+        "application_strategy": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "approach": {
+                    "type": "string",
+                    "enum": ["direct_apply", "referral_preferred", "recruiter_contact", "networking_first"],
+                },
+                "urgency": {
+                    "type": "string",
+                    "enum": ["immediate", "soon", "when_ready", "low_priority"],
+                },
+                "cover_letter_focus": {"type": "array", "items": {"type": "string"}},
+                "potential_objections": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "objection": {"type": "string"},
+                            "counter": {"type": "string"},
+                        },
+                        "required": ["objection", "counter"],
+                    },
+                },
+            },
+            "required": ["approach", "urgency", "cover_letter_focus", "potential_objections"],
+        },
     },
+    "required": [
+        "overall_score", "match_grade", "recommendation",
+        "skills_analysis", "experience_analysis", "education_analysis",
+        "location_analysis", "culture_fit", "insights",
+        "resume_tailoring", "application_strategy"
+    ],
 }
 
 
@@ -269,7 +268,13 @@ class ResumeMatcher:
                 {"role": "system", "content": MATCHER_SYSTEM_PROMPT},
                 {"role": "user", "content": context},
             ],
-            text={"format": {"type": "json_schema", "json_schema": MATCH_ANALYSIS_SCHEMA}},
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": MATCH_ANALYSIS_SCHEMA_NAME,
+                    "schema": MATCH_ANALYSIS_SCHEMA,
+                }
+            },
         )
         
         processing_time = (time.time() - start_time) * 1000
