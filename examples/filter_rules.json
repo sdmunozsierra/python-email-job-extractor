@@ -1,0 +1,66 @@
+{
+  "job_source_domains": [
+    "greenhouse.io",
+    "lever.co",
+    "workable.com",
+    "icims.com",
+    "ashbyhq.com",
+    "smartrecruiters.com",
+    "myworkday.com",
+    "jobvite.com",
+    "linkedin.com",
+    "indeed.com",
+    "glassdoor.com"
+  ],
+  "non_job_domains": [
+    "e.allegiant.com",
+    "email.meetup.com",
+    "announcements.soundcloud.com"
+  ],
+  "job_keywords": [
+    "recruiter",
+    "opportunity",
+    "role",
+    "position",
+    "interview",
+    "offer",
+    "compensation",
+    "application",
+    "resume",
+    "technical screen",
+    "coding challenge",
+    "internship"
+  ],
+  "role_title_patterns": [
+    "\\bsoftware engineer\\b",
+    "\\bdata scientist\\b",
+    "\\bproduct manager\\b",
+    "\\bdevops\\b",
+    "\\bml engineer\\b|\\bmachine learning\\b"
+  ],
+  "promo_negative_patterns": [
+    "\\bpromo code\\b",
+    "\\bdiscount\\b",
+    "\\bnewsletter\\b",
+    "\\bunsubscribe\\b"
+  ],
+  "edu_negative_patterns": [
+    "\\badmissions?\\b",
+    "\\bapply(ing|)\\b.*\\b(program|degree|master|mba)\\b"
+  ],
+  "strong_job_signal_patterns": [
+    "\\binterview\\b",
+    "\\bphone screen\\b",
+    "\\boffer letter\\b",
+    "\\bbackground check\\b",
+    "\\bcompensation\\b"
+  ],
+  "interview_context_patterns": [
+    "\\binterview\\b",
+    "\\bphone screen\\b",
+    "\\brecruit(er|ing)\\b"
+  ],
+  "oa_assessment_patterns": [
+    "\\b(online assessment|assessment|coding challenge|take[- ]home|codesignal|codility)\\b"
+  ]
+}

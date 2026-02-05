@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "job_opportunity",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "job_title": { "type": ["string", "null"] },
+    "company": { "type": ["string", "null"] },
+
+    "recruiter_name": { "type": ["string", "null"] },
+    "recruiter_company": { "type": ["string", "null"] },
+    "recruiter_email": { "type": ["string", "null"] },
+    "recruiter_phone": { "type": ["string", "null"] },
+    "social_links": { "type": "array", "items": { "type": "string" } },
+
+    "locations": { "type": "array", "items": { "type": "string" } },
+    "remote": { "type": ["boolean", "null"] },
+    "hybrid": { "type": ["boolean", "null"] },
+
+    "summary": { "type": ["string", "null"] },
+
+    "hard_requirements": { "type": "array", "items": { "type": "string" } },
+    "mandatory_skills": { "type": "array", "items": { "type": "string" } },
+    "preferred_skills": { "type": "array", "items": { "type": "string" } },
+    "responsibilities": { "type": "array", "items": { "type": "string" } },
+    "qualifications": { "type": "array", "items": { "type": "string" } },
+
+    "engagement_options": {
+      "type": "array",
+      "description": "One or more employment/contract arrangements (FT/PT/W2/C2C/etc).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "FULL_TIME",
+              "PART_TIME",
+              "CONTRACT_W2",
+              "CONTRACT_C2C",
+              "CONTRACT_1099",
+              "UNKNOWN"
+            ]
+          },
+          "duration": { "type": ["string", "null"] },
+          "pay": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "min": { "type": ["number", "null"] },
+              "max": { "type": ["number", "null"] },
+              "currency": { "type": ["string", "null"] },
+              "unit": { "type": ["string", "null"] },
+              "notes": { "type": ["string", "null"] }
+            },
+            "required": ["min", "max", "currency", "unit", "notes"]
+          },
+          "benefits_notes": { "type": ["string", "null"] },
+          "constraints": { "type": "array", "items": { "type": "string" } },
+          "differences_vs_other_options": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": [
+          "type",
+          "duration",
+          "pay",
+          "benefits_notes",
+          "constraints",
+          "differences_vs_other_options",
+          "evidence"
+        ]
+      }
+    },
+
+    "apply_link": { "type": ["string", "null"] },
+
+    "source_email": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "message_id": { "type": "string" },
+        "thread_id": { "type": ["string", "null"] },
+        "subject": { "type": ["string", "null"] },
+        "from": { "type": ["string", "null"] },
+        "date": { "type": ["string", "null"] }
+      },
+      "required": ["message_id"]
+    },
+
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "missing_fields": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "required": [
+    "job_title",
+    "company",
+    "recruiter_name",
+    "recruiter_company",
+    "recruiter_email",
+    "recruiter_phone",
+    "social_links",
+    "locations",
+    "remote",
+    "hybrid",
+    "summary",
+    "hard_requirements",
+    "mandatory_skills",
+    "preferred_skills",
+    "responsibilities",
+    "qualifications",
+    "engagement_options",
+    "apply_link",
+    "source_email",
+    "evidence",
+    "missing_fields",
+    "confidence"
+  ]
+}
