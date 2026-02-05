@@ -1,0 +1,179 @@
+{
+  "personal": {
+    "name": "Alex Johnson",
+    "email": "alex.johnson@email.com",
+    "phone": "+1 (555) 123-4567",
+    "location": "San Francisco, CA",
+    "linkedin": "https://linkedin.com/in/alexjohnson",
+    "github": "https://github.com/alexjohnson",
+    "portfolio": "https://alexjohnson.dev",
+    "summary": "Senior Software Engineer with 7+ years of experience building scalable backend systems and cloud-native applications. Passionate about distributed systems, API design, and developer experience. Led teams of 3-5 engineers and delivered high-impact projects at growth-stage startups."
+  },
+  "skills": {
+    "technical": [
+      { "name": "Python", "level": "expert", "years": 7, "category": "languages" },
+      { "name": "Go", "level": "advanced", "years": 3, "category": "languages" },
+      { "name": "TypeScript", "level": "advanced", "years": 4, "category": "languages" },
+      { "name": "SQL", "level": "advanced", "years": 6, "category": "languages" },
+      { "name": "PostgreSQL", "level": "advanced", "years": 5, "category": "databases" },
+      { "name": "Redis", "level": "intermediate", "years": 4, "category": "databases" },
+      { "name": "MongoDB", "level": "intermediate", "years": 3, "category": "databases" },
+      { "name": "AWS", "level": "advanced", "years": 5, "category": "cloud" },
+      { "name": "Docker", "level": "advanced", "years": 5, "category": "devops" },
+      { "name": "Kubernetes", "level": "intermediate", "years": 3, "category": "devops" },
+      { "name": "Terraform", "level": "intermediate", "years": 2, "category": "devops" },
+      { "name": "FastAPI", "level": "expert", "years": 3, "category": "frameworks" },
+      { "name": "Django", "level": "advanced", "years": 5, "category": "frameworks" },
+      { "name": "React", "level": "intermediate", "years": 3, "category": "frameworks" },
+      { "name": "GraphQL", "level": "intermediate", "years": 2, "category": "api" },
+      { "name": "REST API Design", "level": "expert", "years": 6, "category": "api" },
+      { "name": "Microservices", "level": "advanced", "years": 4, "category": "architecture" },
+      { "name": "Event-Driven Architecture", "level": "intermediate", "years": 3, "category": "architecture" },
+      { "name": "CI/CD", "level": "advanced", "years": 5, "category": "devops" },
+      { "name": "Git", "level": "expert", "years": 7, "category": "tools" }
+    ],
+    "soft": [
+      "Technical Leadership",
+      "Mentoring",
+      "Cross-functional Collaboration",
+      "Agile/Scrum",
+      "Technical Writing",
+      "System Design",
+      "Code Review"
+    ],
+    "languages": [
+      { "language": "English", "proficiency": "native" },
+      { "language": "Spanish", "proficiency": "conversational" }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Solutions Architect - Associate",
+        "issuer": "Amazon Web Services",
+        "date": "2023-03",
+        "expiry": "2026-03",
+        "credential_id": "AWS-SAA-12345"
+      },
+      {
+        "name": "Certified Kubernetes Administrator (CKA)",
+        "issuer": "CNCF",
+        "date": "2022-08",
+        "expiry": "2025-08"
+      }
+    ]
+  },
+  "experience": [
+    {
+      "title": "Senior Software Engineer",
+      "company": "TechStartup Inc.",
+      "location": "San Francisco, CA",
+      "start_date": "2021-06",
+      "end_date": null,
+      "current": true,
+      "description": "Lead backend engineer for the core platform team, responsible for API infrastructure and developer experience.",
+      "achievements": [
+        "Designed and implemented a new microservices architecture that reduced API latency by 40% and improved system reliability to 99.95% uptime",
+        "Led migration from monolith to microservices, enabling team to ship features 3x faster",
+        "Built real-time event processing pipeline handling 10M+ events/day using Kafka and Go",
+        "Mentored 3 junior engineers, conducting weekly 1:1s and code reviews",
+        "Established API design standards and documentation practices adopted company-wide"
+      ],
+      "technologies": ["Python", "Go", "PostgreSQL", "Redis", "Kafka", "AWS", "Kubernetes", "Terraform"]
+    },
+    {
+      "title": "Software Engineer",
+      "company": "MidSize Corp",
+      "location": "San Francisco, CA",
+      "start_date": "2018-03",
+      "end_date": "2021-05",
+      "current": false,
+      "description": "Full-stack engineer on the payments team, building features for B2B payment processing platform.",
+      "achievements": [
+        "Built payment reconciliation system processing $50M+ monthly transactions with 99.99% accuracy",
+        "Developed internal admin dashboard using React and GraphQL, reducing support ticket resolution time by 60%",
+        "Implemented PCI-compliant data handling procedures and passed annual security audits",
+        "Optimized database queries reducing average response time from 500ms to 50ms"
+      ],
+      "technologies": ["Python", "Django", "PostgreSQL", "React", "GraphQL", "AWS", "Docker"]
+    },
+    {
+      "title": "Junior Software Engineer",
+      "company": "BigTech Solutions",
+      "location": "Seattle, WA",
+      "start_date": "2016-07",
+      "end_date": "2018-02",
+      "current": false,
+      "description": "Backend developer on the data platform team.",
+      "achievements": [
+        "Developed ETL pipelines processing 1TB+ data daily using Python and Apache Airflow",
+        "Built REST APIs for internal data services serving 100+ internal applications",
+        "Contributed to open-source data validation library with 500+ GitHub stars"
+      ],
+      "technologies": ["Python", "SQL", "Apache Airflow", "AWS", "PostgreSQL"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor of Science",
+      "field": "Computer Science",
+      "institution": "University of Washington",
+      "location": "Seattle, WA",
+      "start_date": "2012-09",
+      "end_date": "2016-06",
+      "gpa": "3.7",
+      "honors": "Cum Laude",
+      "relevant_coursework": [
+        "Distributed Systems",
+        "Database Systems",
+        "Algorithms",
+        "Operating Systems",
+        "Computer Networks"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "OpenAPI Generator Plugin",
+      "description": "Open-source plugin for generating type-safe API clients from OpenAPI specifications",
+      "url": "https://github.com/alexjohnson/openapi-gen",
+      "technologies": ["Python", "Jinja2", "OpenAPI"],
+      "highlights": [
+        "500+ GitHub stars, used by 50+ companies",
+        "Published as pip package with 10K+ monthly downloads"
+      ]
+    },
+    {
+      "name": "Home Lab Kubernetes Cluster",
+      "description": "Self-hosted Kubernetes cluster for learning and running personal services",
+      "technologies": ["Kubernetes", "Terraform", "ArgoCD", "Prometheus"],
+      "highlights": [
+        "Runs 20+ services including monitoring, CI/CD, and personal applications",
+        "Documented setup process in a blog series with 10K+ views"
+      ]
+    }
+  ],
+  "preferences": {
+    "desired_roles": [
+      "Senior Software Engineer",
+      "Staff Engineer",
+      "Tech Lead",
+      "Principal Engineer"
+    ],
+    "industries": [
+      "Technology",
+      "FinTech",
+      "Developer Tools",
+      "B2B SaaS"
+    ],
+    "locations": [
+      "San Francisco, CA",
+      "Seattle, WA",
+      "New York, NY"
+    ],
+    "remote_preference": "hybrid",
+    "salary_min": 180000,
+    "salary_currency": "USD",
+    "engagement_types": ["FULL_TIME"],
+    "willing_to_relocate": false,
+    "visa_sponsorship_needed": false
+  }
+}
