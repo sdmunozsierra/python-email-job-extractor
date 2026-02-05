@@ -21,6 +21,8 @@ from .io import (
     read_match_results,
     write_job_analyses,
     read_job_analyses,
+    write_tailoring_report,
+    write_tailoring_results,
 )
 from .pipeline import (
     build_filter_pipeline,
@@ -447,6 +449,147 @@ def _cmd_rank(args: argparse.Namespace) -> None:
             print(f"   Gap: {r.skills_match.missing_mandatory[0]}")
 
 
+# ============================================================================
+# Resume Tailoring Commands
+# ============================================================================
+
+def _cmd_tailor(args: argparse.Namespace) -> None:
+    """Tailor a resume for one or more job opportunities using match results."""
+    from .tailoring import TailoringEngine
+    from .tailoring.report import render_tailoring_report, render_tailoring_summary
+
+    # Load inputs
+    resume = read_resume(args.resume)
+    print(f"Loaded resume for: {resume.personal.name}")
+
+    match_results = read_match_results(args.match_results)
+    print(f"Loaded {len(match_results)} match results")
+
+    # Optionally load opportunities for context
+    opportunities = []
+    jobs_map = {}
+    if args.opportunities:
+        opportunities = read_opportunities(args.opportunities)
+        for opp in opportunities:
+            msg_id = opp.get("source_email", {}).get("message_id")
+            if msg_id:
+                jobs_map[msg_id] = opp
+        print(f"Loaded {len(opportunities)} opportunities for context")
+
+    # Filter match results
+    if args.min_score:
+        match_results = [r for r in match_results if r.overall_score >= args.min_score]
+        print(f"After min-score filter: {len(match_results)} results")
+
+    if args.recommendation:
+        recs = set(args.recommendation.split(","))
+        match_results = [r for r in match_results if r.recommendation in recs]
+        print(f"After recommendation filter: {len(match_results)} results")
+
+    if args.top:
+        match_results.sort(key=lambda r: r.overall_score, reverse=True)
+        match_results = match_results[:args.top]
+
+    if not match_results:
+        print("No match results to tailor for.")
+        return
+
+    # Set up engine
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    engine = TailoringEngine(output_dir=out_dir)
+
+    build_docx = not args.no_docx
+    tailored_resumes = []
+
+    for i, match_result in enumerate(match_results, 1):
+        job = jobs_map.get(match_result.job_id, {})
+        job_title = job.get("job_title", "Unknown")
+        company = job.get("company", "Unknown")
+        print(f"\nTailoring [{i}/{len(match_results)}]: {job_title} at {company}...")
+
+        try:
+            tailored = engine.tailor(resume, match_result, job, build_docx=build_docx)
+            tailored_resumes.append(tailored)
+
+            # Save individual report
+            report_dir = out_dir / "tailoring_reports"
+            report_dir.mkdir(parents=True, exist_ok=True)
+
+            # JSON report
+            json_path = report_dir / f"{match_result.job_id}_report.json"
+            write_tailoring_report(json_path, tailored.report.to_dict())
+
+            # Markdown report
+            md_path = report_dir / f"{match_result.job_id}_report.md"
+            md = render_tailoring_report(tailored.report)
+            md_path.write_text(md, encoding="utf-8")
+
+            # Save tailored resume JSON
+            resume_json_path = report_dir / f"{match_result.job_id}_resume.json"
+            import json as _json
+            resume_json_path.write_text(
+                _json.dumps(tailored.resume_data, indent=2),
+                encoding="utf-8",
+            )
+
+            print(f"  Changes: {tailored.report.total_changes}")
+            if tailored.docx_path:
+                print(f"  .docx: {tailored.docx_path}")
+
+        except Exception as e:
+            print(f"  Error: {e}")
+
+    if not tailored_resumes:
+        print("\nNo resumes were tailored successfully.")
+        return
+
+    # Save batch results
+    batch_results = [tr.to_dict() for tr in tailored_resumes]
+    results_path = out_dir / "tailoring_results.json"
+    write_tailoring_results(results_path, batch_results)
+    print(f"\nBatch results saved to {results_path}")
+
+    # Save summary report
+    summary_path = out_dir / "tailoring_summary.md"
+    summary_md = render_tailoring_summary(tailored_resumes)
+    summary_path.write_text(summary_md, encoding="utf-8")
+    print(f"Summary report saved to {summary_path}")
+
+    # Print console summary
+    _print_tailoring_summary(tailored_resumes)
+
+
+def _print_tailoring_summary(tailored_resumes: list) -> None:
+    """Print a tailoring summary to console."""
+    print("\n" + "=" * 60)
+    print(f"TAILORING SUMMARY - {len(tailored_resumes)} Resumes Generated")
+    print("=" * 60)
+
+    total_changes = 0
+    for i, tr in enumerate(tailored_resumes, 1):
+        r = tr.report
+        total_changes += r.total_changes
+        print(f"\n{i}. {r.job_title} at {r.company}")
+        print(f"   Match: {r.match_score:.0f}/100 ({r.match_grade})")
+        print(f"   Changes: {r.total_changes}", end="")
+
+        # Show category breakdown
+        by_cat = r.changes_by_category
+        if by_cat:
+            parts = [f"{cat.value}={len(items)}" for cat, items in by_cat.items()]
+            print(f" ({', '.join(parts)})")
+        else:
+            print()
+
+        if tr.docx_path:
+            print(f"   .docx: {tr.docx_path}")
+
+    print(f"\nTotal changes across all resumes: {total_changes}")
+    docx_count = sum(1 for tr in tailored_resumes if tr.docx_path)
+    print(f"Generated .docx files: {docx_count}/{len(tailored_resumes)}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Email opportunity pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -602,6 +745,48 @@ def main() -> None:
         help="Limit to top N results"
     )
     rank.set_defaults(func=_cmd_rank)
+
+    # =========================================================================
+    # Resume Tailoring Command
+    # =========================================================================
+
+    tailor = subparsers.add_parser(
+        "tailor",
+        help="Tailor a resume for job opportunities using match results"
+    )
+    tailor.add_argument(
+        "--resume", required=True,
+        help="Path to the original resume file (JSON or Markdown)"
+    )
+    tailor.add_argument(
+        "--match-results", required=True,
+        help="Path to match results JSON file (from 'match' command)"
+    )
+    tailor.add_argument(
+        "--opportunities",
+        help="Path to opportunities JSON file (for job context in reports)"
+    )
+    tailor.add_argument(
+        "--out", required=True,
+        help="Output directory for tailored resumes and reports"
+    )
+    tailor.add_argument(
+        "--min-score", type=float,
+        help="Only tailor for jobs with at least this match score"
+    )
+    tailor.add_argument(
+        "--recommendation",
+        help="Comma-separated recommendations to tailor for (e.g. strong_apply,apply)"
+    )
+    tailor.add_argument(
+        "--top", type=int,
+        help="Limit to top N match results by score"
+    )
+    tailor.add_argument(
+        "--no-docx", action="store_true",
+        help="Skip .docx generation (produce JSON/Markdown reports only)"
+    )
+    tailor.set_defaults(func=_cmd_tailor)
 
     args = parser.parse_args()
     args.func(args)

@@ -165,3 +165,42 @@ def read_job_analyses(path: str | Path) -> List[Dict[str, Any]]:
     """
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     return raw.get("analyses", []) or []
+
+
+# Tailoring I/O
+
+def write_tailoring_report(
+    path: str | Path,
+    report_data: Dict[str, Any],
+) -> None:
+    """
+    Write a tailoring report to a JSON file.
+
+    Args:
+        path: Output path
+        report_data: Tailoring report dict (from TailoringReport.to_dict())
+    """
+    payload = {
+        "created_at_utc": _utc_now_iso(),
+        **report_data,
+    }
+    Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def write_tailoring_results(
+    path: str | Path,
+    results: List[Dict[str, Any]],
+) -> None:
+    """
+    Write batch tailoring results to a JSON file.
+
+    Args:
+        path: Output path
+        results: List of tailoring result dicts
+    """
+    payload = {
+        "created_at_utc": _utc_now_iso(),
+        "count": len(results),
+        "tailoring_results": results,
+    }
+    Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
