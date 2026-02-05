@@ -1,0 +1,481 @@
+{
+  "personal": {
+    "name": "Sergio Munoz",
+    "email": "sergio.munoz@email.com",
+    "phone": "+1 (555) 123-4567",
+    "location": "Remote",
+    "linkedin": null,
+    "github": "https://github.com/sergiomunoz",
+    "portfolio": "https://sergiom.dev",
+    "summary": "Senior GenAI, Observability, and Cloud/DevSecOps Engineer with 9+ years of experience designing and operating production-grade AI, data, and cloud-native systems. Specialized in Vector.dev and Elastic/ELK observability pipelines, large-scale ingestion/analytics systems, and LLM-powered applications (RAG, prompt lifecycle management) using LangChain and OpenAI/Azure OpenAI. Strong background in Python, Kubernetes, Terraform/Ansible, CI/CD (GitLab/GitHub Actions/Jenkins), and microservices. Proven ability to lead cross-functional teams, mentor engineers, and deliver secure, scalable solutions for enterprises and regulated environments."
+  },
+  "skills": {
+    "technical": [
+      { "name": "Python", "level": "expert", "years": 9, "category": "languages" },
+      { "name": "JavaScript", "level": "advanced", "years": 6, "category": "languages" },
+      { "name": "TypeScript", "level": "advanced", "years": 5, "category": "languages" },
+      { "name": "Java", "level": "advanced", "years": 7, "category": "languages" },
+      { "name": "Bash", "level": "advanced", "years": 8, "category": "languages" },
+      { "name": "Lua", "level": "intermediate", "years": 3, "category": "languages" },
+      { "name": "Rust", "level": "intermediate", "years": 2, "category": "languages" },
+      { "name": "Vector.dev", "level": "expert", "years": 3, "category": "observability" },
+      { "name": "VRL (Vector Remap Language)", "level": "advanced", "years": 2, "category": "observability" },
+      { "name": "Elastic Stack (ELK)", "level": "expert", "years": 6, "category": "observability" },
+      { "name": "Elasticsearch", "level": "expert", "years": 6, "category": "databases" },
+      { "name": "Logstash", "level": "advanced", "years": 4, "category": "observability" },
+      { "name": "Kibana", "level": "advanced", "years": 4, "category": "observability" },
+      { "name": "Prometheus", "level": "advanced", "years": 4, "category": "observability" },
+      { "name": "Grafana", "level": "advanced", "years": 5, "category": "observability" },
+      { "name": "Splunk", "level": "intermediate", "years": 1, "category": "observability" },
+      { "name": "OCSF (schema mapping)", "level": "intermediate", "years": 1, "category": "security" },
+      { "name": "Apache Kafka", "level": "advanced", "years": 5, "category": "data" },
+      { "name": "Apache NiFi", "level": "advanced", "years": 3, "category": "data" },
+      { "name": "ETL/ELT Pipelines", "level": "expert", "years": 8, "category": "data" },
+      { "name": "Data Normalization & Enrichment", "level": "expert", "years": 8, "category": "data" },
+      { "name": "Pandas", "level": "advanced", "years": 5, "category": "data" },
+      { "name": "SQL", "level": "advanced", "years": 7, "category": "languages" },
+      { "name": "PostgreSQL", "level": "advanced", "years": 6, "category": "databases" },
+      { "name": "MongoDB", "level": "advanced", "years": 4, "category": "databases" },
+      { "name": "Cassandra", "level": "intermediate", "years": 2, "category": "databases" },
+      { "name": "Redis", "level": "intermediate", "years": 3, "category": "databases" },
+      { "name": "OpenAI", "level": "advanced", "years": 2, "category": "genai" },
+      { "name": "Azure OpenAI", "level": "advanced", "years": 2, "category": "genai" },
+      { "name": "AWS Bedrock", "level": "intermediate", "years": 1, "category": "genai" },
+      { "name": "LangChain", "level": "advanced", "years": 2, "category": "genai" },
+      { "name": "Retrieval-Augmented Generation (RAG)", "level": "advanced", "years": 2, "category": "genai" },
+      { "name": "Hugging Face Transformers", "level": "advanced", "years": 3, "category": "ml" },
+      { "name": "Prompt Lifecycle Management", "level": "advanced", "years": 2, "category": "genai" },
+      { "name": "Embeddings & Vector Search (ES/Mongo)", "level": "advanced", "years": 2, "category": "genai" },
+      { "name": "TensorFlow", "level": "intermediate", "years": 2, "category": "ml" },
+      { "name": "PyTorch", "level": "intermediate", "years": 2, "category": "ml" },
+      { "name": "Keras", "level": "intermediate", "years": 2, "category": "ml" },
+      { "name": "RNNs (predictive analytics)", "level": "intermediate", "years": 2, "category": "ml" },
+      { "name": "AWS", "level": "advanced", "years": 6, "category": "cloud" },
+      { "name": "Azure", "level": "advanced", "years": 3, "category": "cloud" },
+      { "name": "Kubernetes", "level": "advanced", "years": 4, "category": "devops" },
+      { "name": "Docker", "level": "expert", "years": 7, "category": "devops" },
+      { "name": "Terraform", "level": "advanced", "years": 5, "category": "devops" },
+      { "name": "Ansible", "level": "advanced", "years": 5, "category": "devops" },
+      { "name": "GitOps", "level": "advanced", "years": 3, "category": "devops" },
+      { "name": "GitLab CI/CD", "level": "advanced", "years": 6, "category": "devops" },
+      { "name": "GitHub Actions", "level": "advanced", "years": 2, "category": "devops" },
+      { "name": "Jenkins", "level": "intermediate", "years": 3, "category": "devops" },
+      { "name": "Linux", "level": "advanced", "years": 9, "category": "tools" },
+      { "name": "Nginx", "level": "advanced", "years": 4, "category": "devops" },
+      { "name": "Traefik", "level": "advanced", "years": 3, "category": "devops" },
+      { "name": "VM/Virtualization (Virtio/Libvirt)", "level": "intermediate", "years": 2, "category": "devops" },
+      { "name": "FastAPI", "level": "advanced", "years": 3, "category": "frameworks" },
+      { "name": "Django", "level": "advanced", "years": 4, "category": "frameworks" },
+      { "name": "Flask", "level": "advanced", "years": 5, "category": "frameworks" },
+      { "name": "Node.js", "level": "advanced", "years": 5, "category": "frameworks" },
+      { "name": "React", "level": "intermediate", "years": 3, "category": "frameworks" },
+      { "name": "Vue", "level": "advanced", "years": 4, "category": "frameworks" },
+      { "name": "Nuxt", "level": "advanced", "years": 3, "category": "frameworks" },
+      { "name": "Spring Boot", "level": "advanced", "years": 5, "category": "frameworks" },
+      { "name": "REST API Design", "level": "expert", "years": 8, "category": "api" },
+      { "name": "GraphQL", "level": "intermediate", "years": 2, "category": "api" },
+      { "name": "DevSecOps", "level": "advanced", "years": 4, "category": "security" },
+      { "name": "Secure API Development", "level": "advanced", "years": 4, "category": "security" },
+      { "name": "Whitebox Testing", "level": "advanced", "years": 4, "category": "security" },
+      { "name": "Blackbox Testing", "level": "intermediate", "years": 2, "category": "security" },
+      { "name": "Linux Hardening", "level": "intermediate", "years": 3, "category": "security" }
+    ],
+    "soft": [
+      "Technical Leadership",
+      "Mentoring & Coaching",
+      "Cross-functional Collaboration",
+      "Stakeholder & Executive Communication",
+      "Customer-facing Engineering (Pre/Post Sales)",
+      "Technical Account Management",
+      "Agile/Scrum",
+      "System Design",
+      "Incident Response & Operations",
+      "Documentation & Technical Writing"
+    ],
+    "languages": [
+      { "language": "English", "proficiency": "fluent" },
+      { "language": "Spanish", "proficiency": "fluent" },
+      { "language": "French", "proficiency": "B2" }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Certified Cloud Practitioner",
+        "issuer": "Amazon Web Services (AWS)",
+        "date": "2021-10",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "AWS Certified Solutions Architect – Associate",
+        "issuer": "Amazon Web Services (AWS)",
+        "date": "2022-03",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Cloud Digital Leader",
+        "issuer": "Google",
+        "date": "2022-05",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Machine Learning for Leaders",
+        "issuer": "Amazon Web Services (AWS)",
+        "date": "2024-02",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Developing AI Applications with Python and Flask",
+        "issuer": "IBM",
+        "date": "2024-04",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Generative AI for Everyone",
+        "issuer": "DeepLearning.AI",
+        "date": "2024-01",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Python for Data Science, AI & Development",
+        "issuer": "IBM",
+        "date": "2024-04",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Building Generative AI-Powered Applications with Python",
+        "issuer": "IBM",
+        "date": "2024-04",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "IBM AI Developer",
+        "issuer": "IBM",
+        "date": "2024-04",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Generative AI Fundamentals",
+        "issuer": "IBM",
+        "date": "2024-04",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Blockchain Security",
+        "issuer": "Infosec",
+        "date": "2022-03",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "The Complete Traefik Course",
+        "issuer": "Udemy for Business",
+        "date": "2022-01",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Modern Web Scraping with Python",
+        "issuer": "Udemy for Business",
+        "date": "2020-12",
+        "expiry": null,
+        "credential_id": null
+      },
+      {
+        "name": "Recursion, Backtracking and Dynamic Programming in Python",
+        "issuer": "Udemy for Business",
+        "date": "2021-07",
+        "expiry": null,
+        "credential_id": null
+      }
+    ]
+  },
+  "experience": [
+    {
+      "title": "Senior Data Engineer",
+      "company": "CVS",
+      "location": "Remote",
+      "start_date": "2025-04",
+      "end_date": "2026-01",
+      "current": false,
+      "description": "Built and operated cloud-native observability/data pipelines for large-scale telemetry across multi-cloud environments.",
+      "achievements": [
+        "Deployed decentralized Vector.dev instances on Kubernetes to ingest, transform, and route logs/metrics to systems across Azure, AWS, and Splunk",
+        "Transformed telemetry using VRL into standardized schemas (including security-oriented formats such as OCSF)",
+        "Implemented GitOps-style delivery where declarative configs were applied via GitHub Actions to multiple cloud providers",
+        "Built dashboards for health, throughput, and error-rate monitoring; configured alerting workflows routed through OpsGenie"
+      ],
+      "technologies": [
+        "Vector.dev",
+        "Kubernetes",
+        "VRL",
+        "GitHub Actions",
+        "Azure",
+        "AWS",
+        "Splunk",
+        "Grafana",
+        "Prometheus",
+        "GitOps"
+      ]
+    },
+    {
+      "title": "Senior DevSecOps Engineer",
+      "company": "Cleta LLC",
+      "location": "Remote",
+      "start_date": "2023-11",
+      "end_date": "2025-03",
+      "current": false,
+      "description": "Owned GenAI platform engineering, observability, and secure automation for cloud-native systems and internal products.",
+      "achievements": [
+        "Deployed centralized Vector.dev pipelines to ingest, enrich, normalize, and route logs into Elasticsearch for unified observability and alerting",
+        "Built Python and Lua tooling for log enrichment, schema normalization, and intelligent routing based on patterns and telemetry types",
+        "Engineered full-stack AI applications and API services using FastAPI/Django/Node.js with modern front-ends (Vue/Nuxt/React)",
+        "Implemented LangChain-based RAG systems (ingestion, chunking, embeddings, retrieval, routing, memory, parsing) backed by Elasticsearch and MongoDB",
+        "Built IaC automation using Ansible/Terraform and managed edge/reverse proxies (Traefik/Nginx) and virtualization clusters (Virtio/Libvirt)",
+        "Improved reliability and debuggability via comprehensive logging/monitoring standards and CI/CD automation (GitLab/Jenkins)"
+      ],
+      "technologies": [
+        "Vector.dev",
+        "Elasticsearch",
+        "Grafana",
+        "Prometheus",
+        "Python",
+        "Lua",
+        "FastAPI",
+        "Django",
+        "Node.js",
+        "Vue",
+        "Nuxt",
+        "React",
+        "MongoDB",
+        "Ansible",
+        "Terraform",
+        "Docker",
+        "Traefik",
+        "Nginx",
+        "GitLab",
+        "Jenkins",
+        "LangChain"
+      ]
+    },
+    {
+      "title": "AI Solutions Architect (Senior)",
+      "company": "PubNub, Inc.",
+      "location": "San Francisco, CA",
+      "start_date": "2022-06",
+      "end_date": "2023-11",
+      "current": false,
+      "description": "Customer-facing AI/solutions engineering and platform delivery across observability, analytics pipelines, and LLM productization.",
+      "achievements": [
+        "Managed technical account relationships for 35\u201375+ enterprise clients, delivering training, monitoring, troubleshooting, and architectural guidance",
+        "Built ELK + MongoDB analytics pipelines (including NiFi-based ingestion) for AI usage analytics with real-time integrity monitoring",
+        "Integrated Azure OpenAI with secure logging layers for cross-cloud observability and governance",
+        "Designed and deployed a prompt lifecycle management system with telemetry and health checks to support RAG-based AI applications",
+        "Conducted pre/post-sales engineering: technical pitches, demos, prototypes, and rapid use-case analysis to optimize performance and uncover hidden costs",
+        "Helped drive internal AI initiatives and executive stakeholder communication"
+      ],
+      "technologies": [
+        "Azure OpenAI",
+        "OpenAI",
+        "ELK Stack",
+        "Elasticsearch",
+        "MongoDB",
+        "Apache NiFi",
+        "Docker",
+        "FastAPI",
+        "LangChain",
+        "GitLab"
+      ]
+    },
+    {
+      "title": "Principal DevOps / Full Stack Engineer",
+      "company": "Infinitive, Inc.",
+      "location": "Ashburn, VA",
+      "start_date": "2022-03",
+      "end_date": "2022-06",
+      "current": false,
+      "description": "Architected data ingestion and analytics platforms for financial services clients (Capital One), focused on self-service insights and reliability.",
+      "achievements": [
+        "Architected ingestion of structured and semi-structured data into unified repositories using Ansible and ELK on AWS",
+        "Built automated cleansing/enrichment pipelines applying advanced business logic for accuracy and reporting consistency",
+        "Designed KPI dashboards and scorecards (Grafana/Elasticsearch) enabling self-service analytics and faster decision-making",
+        "Orchestrated infrastructure via Terraform and CI/CD pipelines through GitLab"
+      ],
+      "technologies": ["AWS", "ELK Stack", "Ansible", "Terraform", "Grafana", "GitLab", "Elasticsearch"]
+    },
+    {
+      "title": "Lead Software Engineer",
+      "company": "Leidos, Inc.",
+      "location": "Reston, VA",
+      "start_date": "2018-01",
+      "end_date": "2022-03",
+      "current": false,
+      "description": "Led delivery of distributed cloud systems with strong CI/CD and observability foundations; mentored teams and drove performance improvements.",
+      "achievements": [
+        "Built distributed cloud systems with Docker, GitLab, and Ansible; implemented 10+ services including Kafka, Redis, and Elasticsearch",
+        "Led Agile teams (5\u201312 members) and coordinated with stakeholders to deliver scalable solutions with monitoring and performance tooling",
+        "Developed Spring Boot microservices and full-stack integrations; streamlined CI/CD and reduced staging time from days to minutes via automation",
+        "Created predictive analytics (RNNs) to optimize AWS resource usage; delivered dashboards and a Flask app for real-time AWS metrics"
+      ],
+      "technologies": [
+        "AWS",
+        "Docker",
+        "GitLab",
+        "Ansible",
+        "Spring Boot",
+        "Kafka",
+        "Redis",
+        "Elasticsearch",
+        "Flask",
+        "Python",
+        "RNNs"
+      ]
+    },
+    {
+      "title": "IT Specialist",
+      "company": "T.E.B Benefits, Inc.",
+      "location": "El Paso, TX",
+      "start_date": "2015-12",
+      "end_date": "2017-12",
+      "current": false,
+      "description": "Established automation capabilities and built ETL/compliance systems to reduce manual workload and improve data integrity.",
+      "achievements": [
+        "Founded the Automation Solutions department",
+        "Created ETL pipelines and compliance monitoring systems, reducing data validation time by ~90%",
+        "Developed batch-processing systems and Java-based compliance reporting tools; implemented secure FTP/SFTP workflows",
+        "Supported and maintained critical IT systems with focus on reliability and operational efficiency"
+      ],
+      "technologies": ["Java", "Bash", "PostgreSQL", "FTP/SFTP"]
+    },
+    {
+      "title": "Manager",
+      "company": "TotalFun",
+      "location": "Cd. Juarez, CHIH",
+      "start_date": "2012-12",
+      "end_date": "2015-12",
+      "current": false,
+      "description": "Operational and technical leadership; built internal tools and improved processes for customer and employee workflows.",
+      "achievements": [
+        "Designed a customer database and web application improving employee efficiency and data accessibility",
+        "Reduced employee onboarding time from ~2 weeks to ~3 days through process optimization and documentation",
+        "Led marketing/PR/partnerships and built automation scripts for scheduled social posting",
+        "Reported directly to executive leadership with analysis and recommendations"
+      ],
+      "technologies": ["JavaScript", "Automation Scripting", "Web Development"]
+    },
+    {
+      "title": "Founder (Consulting / R&D)",
+      "company": "Cleta LLC",
+      "location": "Arlington, VA",
+      "start_date": "2020-08",
+      "end_date": null,
+      "current": true,
+      "description": "Consulting and R&D work focused on cloud-native developer tools and AI/blockchain integration.",
+      "achievements": [
+        "Established a serverless cloud infrastructure for consulting engagements and prototyping",
+        "Led R&D initiatives exploring AI impacts on developer tooling and enterprise workflows"
+      ],
+      "technologies": ["Cloud Architecture", "Serverless", "AI/ML", "Dev Tools"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor of Science",
+      "field": "Computer Science (Minor in Mathematics)",
+      "institution": "The University of Texas at El Paso",
+      "location": "El Paso, TX",
+      "start_date": null,
+      "end_date": "2019-12",
+      "gpa": null,
+      "honors": null,
+      "relevant_coursework": [
+        "Artificial Intelligence",
+        "Numerical Analysis",
+        "Networks",
+        "Software Construction",
+        "Secure Web Systems"
+      ]
+    },
+    {
+      "degree": "Master of Science",
+      "field": "Data Analytics / Data Science",
+      "institution": "Western Governors University",
+      "location": "Remote",
+      "start_date": null,
+      "end_date": "2026-12",
+      "gpa": null,
+      "honors": "Dean's List (as noted)",
+      "relevant_coursework": [
+        "Analytics Programming",
+        "Data Storytelling for Varied Audiences",
+        "Statistical Data Mining"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Vector.dev Observability Platform (Centralized + Decentralized)",
+      "description": "Designed and operated Vector.dev-based telemetry pipelines for enrichment, normalization, routing, and multi-destination delivery across cloud environments.",
+      "url": null,
+      "technologies": ["Vector.dev", "VRL", "Kubernetes", "Elasticsearch", "Grafana", "Prometheus", "GitOps"],
+      "highlights": [
+        "Implemented schema normalization and intelligent routing using Python/Lua/VRL",
+        "Enabled unified observability and alerting with dashboards and operational SLO signals"
+      ]
+    },
+    {
+      "name": "Prompt Lifecycle Management + RAG Platform",
+      "description": "Built an LLM application foundation supporting prompt versioning, evaluation, telemetry, health checks, and RAG orchestration.",
+      "url": null,
+      "technologies": ["LangChain", "Azure OpenAI", "OpenAI", "Elasticsearch", "MongoDB", "FastAPI", "Docker"],
+      "highlights": [
+        "End-to-end pipeline: ingestion, chunking, embeddings, retrieval, routing, memory, and output parsing",
+        "Integrated observability and governance-grade logging for AI applications"
+      ]
+    },
+    {
+      "name": "AWS Resource Optimization (Predictive Analytics)",
+      "description": "Developed predictive analytics (RNN-based) and dashboards to optimize AWS usage and support operational decisions.",
+      "url": null,
+      "technologies": ["Python", "RNNs", "Flask", "AWS", "Monitoring Dashboards"],
+      "highlights": [
+        "Delivered actionable insights for resource allocation and cost/performance optimization"
+      ]
+    }
+  ],
+  "preferences": {
+    "desired_roles": [
+      "Senior Observability Engineer",
+      "Senior DevSecOps Engineer",
+      "Senior DevOps Engineer",
+      "Senior Data Engineer",
+      "GenAI Engineer",
+      "Solutions Architect (AI)",
+      "Senior Solutions Engineer",
+      "Platform Engineer"
+    ],
+    "industries": [
+      "Technology",
+      "Cloud Platforms",
+      "Developer Tools",
+      "FinTech / Financial Services",
+      "Healthcare",
+      "Security / Compliance"
+    ],
+    "locations": ["Remote", "San Francisco, CA", "Arlington, VA", "Reston, VA", "Ashburn, VA", "El Paso, TX"],
+    "remote_preference": "remote",
+    "salary_min": null,
+    "salary_currency": "USD",
+    "engagement_types": ["FULL_TIME", "CONTRACT"],
+    "willing_to_relocate": false,
+    "visa_sponsorship_needed": false
+  }
+}
