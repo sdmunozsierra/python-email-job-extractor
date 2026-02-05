@@ -1,23 +1,25 @@
-"""Resume builder — supports both legacy Python data and the new JSON resume schema.
+"""CLI entry point for resume-builder.
 
-Usage:
-    # From JSON schema (new)
-    python main.py --json sample_resume.json
+Usage (via uv)::
 
-    # Legacy Python-coded data (default)
-    python main.py
+    uv run resume-builder --json resume.json --output my_resume.docx
+    uv run resume-builder                        # legacy Python data
+
+Usage (direct)::
+
+    python -m resume_builder --json resume.json
 """
+
 import argparse
+
 import docx
-from docx.shared import Pt
-from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from src.person_builder import PersonBuilder
-from src.education_builder import EducationFactory
-from src.cert_builder import CertFactory
-from src.format_experience import format_experience, format_experience_skills
-from src.schema_adapter import ResumeSchemaAdapter
+from resume_builder.person_builder import PersonBuilder
+from resume_builder.education_builder import EducationFactory
+from resume_builder.cert_builder import CertFactory
+from resume_builder.format_experience import format_experience, format_experience_skills
+from resume_builder.schema_adapter import ResumeSchemaAdapter
 
 
 # ---------------------------------------------------------------------------
@@ -194,12 +196,12 @@ def build_resume(person):
 
 
 # ---------------------------------------------------------------------------
-# Legacy data loader (unchanged logic, just wrapped in a function)
+# Legacy data loader
 # ---------------------------------------------------------------------------
 
 def build_legacy_person():
     """Build a Person using the legacy Python-coded personal info."""
-    from personal_info import sergio_david_munoz_sierra as sdms
+    from resume_builder.personal_info import sergio_david_munoz_sierra as sdms
 
     utep_education = EducationFactory.create_education(
         "Computer Science",
@@ -217,7 +219,8 @@ def build_legacy_person():
         ],
         ["Google Ignite CS Program", "Miner's Cyber Security Club (MSSC)"],
         [
-            "Dr. Omar Baddredin - Crowd-sourcing Road Topology and Driving Patterns using Smartphone's Sensors"
+            "Dr. Omar Baddredin - Crowd-sourcing Road Topology and Driving "
+            "Patterns using Smartphone's Sensors"
         ],
         ["Research with Dr. Omar Baddredin - UTD - 4th Place "],
     )
@@ -268,11 +271,15 @@ def build_legacy_person():
 
 
 # ---------------------------------------------------------------------------
-# Main
+# CLI entry point
 # ---------------------------------------------------------------------------
 
-def main():
-    parser = argparse.ArgumentParser(description="Build a resume document.")
+def main() -> None:
+    """Entry point for the ``resume-builder`` console script."""
+    parser = argparse.ArgumentParser(
+        prog="resume-builder",
+        description="Build a .docx resume from JSON or legacy Python data.",
+    )
     parser.add_argument(
         "--json",
         type=str,

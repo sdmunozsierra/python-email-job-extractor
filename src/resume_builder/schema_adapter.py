@@ -10,7 +10,7 @@ This adapter:
 
 Usage::
 
-    from src.schema_adapter import ResumeSchemaAdapter
+    from resume_builder.schema_adapter import ResumeSchemaAdapter
 
     person = ResumeSchemaAdapter.from_json_file("resume.json")
     # or
@@ -20,12 +20,12 @@ Usage::
 import json
 from pathlib import Path
 
-from src.person_builder import PersonBuilder
-from src.experiece_builder import ExperienceFactory
-from src.education_builder import EducationFactory
-from src.cert_builder import CertFactory
-from src.project_builder import ProjectFactory
-from src.skill import SkillFactory
+from resume_builder.person_builder import PersonBuilder
+from resume_builder.experiece_builder import ExperienceFactory
+from resume_builder.education_builder import EducationFactory
+from resume_builder.cert_builder import CertFactory
+from resume_builder.project_builder import ProjectFactory
+from resume_builder.skill import SkillFactory
 
 
 # Keys the adapter explicitly handles at each level.

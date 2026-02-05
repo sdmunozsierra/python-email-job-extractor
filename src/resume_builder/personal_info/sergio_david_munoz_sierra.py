@@ -1,6 +1,6 @@
 """Personal Information for Sergio David Munoz Sierra"""
-from src.experiece_builder import ExperienceFactory
-from src.project_builder import ProjectFactory
+from resume_builder.experiece_builder import ExperienceFactory
+from resume_builder.project_builder import ProjectFactory
 
 # Experience in Reverse Chronological Order
 
