@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "resume",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "personal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "location": { "type": ["string", "null"] },
+        "linkedin": { "type": ["string", "null"] },
+        "github": { "type": ["string", "null"] },
+        "portfolio": { "type": ["string", "null"] },
+        "summary": { "type": ["string", "null"] }
+      },
+      "required": ["name"]
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "technical": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "level": { 
+                "type": "string",
+                "enum": ["beginner", "intermediate", "advanced", "expert"]
+              },
+              "years": { "type": ["number", "null"] },
+              "category": { "type": ["string", "null"] }
+            },
+            "required": ["name"]
+          }
+        },
+        "soft": { "type": "array", "items": { "type": "string" } },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "language": { "type": "string" },
+              "proficiency": { "type": "string" }
+            },
+            "required": ["language"]
+          }
+        },
+        "certifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "issuer": { "type": ["string", "null"] },
+              "date": { "type": ["string", "null"] },
+              "expiry": { "type": ["string", "null"] },
+              "credential_id": { "type": ["string", "null"] }
+            },
+            "required": ["name"]
+          }
+        }
+      }
+    },
+    "experience": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string" },
+          "company": { "type": "string" },
+          "location": { "type": ["string", "null"] },
+          "start_date": { "type": ["string", "null"] },
+          "end_date": { "type": ["string", "null"] },
+          "current": { "type": "boolean" },
+          "description": { "type": ["string", "null"] },
+          "achievements": { "type": "array", "items": { "type": "string" } },
+          "technologies": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["title", "company"]
+      }
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "degree": { "type": "string" },
+          "field": { "type": ["string", "null"] },
+          "institution": { "type": "string" },
+          "location": { "type": ["string", "null"] },
+          "start_date": { "type": ["string", "null"] },
+          "end_date": { "type": ["string", "null"] },
+          "gpa": { "type": ["string", "null"] },
+          "honors": { "type": ["string", "null"] },
+          "relevant_coursework": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["degree", "institution"]
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "url": { "type": ["string", "null"] },
+          "technologies": { "type": "array", "items": { "type": "string" } },
+          "highlights": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["name"]
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "description": "Job search preferences for better matching",
+      "additionalProperties": false,
+      "properties": {
+        "desired_roles": { "type": "array", "items": { "type": "string" } },
+        "industries": { "type": "array", "items": { "type": "string" } },
+        "locations": { "type": "array", "items": { "type": "string" } },
+        "remote_preference": {
+          "type": "string",
+          "enum": ["remote_only", "hybrid", "onsite", "flexible"]
+        },
+        "salary_min": { "type": ["number", "null"] },
+        "salary_currency": { "type": ["string", "null"] },
+        "engagement_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["FULL_TIME", "PART_TIME", "CONTRACT_W2", "CONTRACT_C2C", "CONTRACT_1099"]
+          }
+        },
+        "willing_to_relocate": { "type": "boolean" },
+        "visa_sponsorship_needed": { "type": "boolean" }
+      }
+    }
+  },
+  "required": ["personal"]
+}
