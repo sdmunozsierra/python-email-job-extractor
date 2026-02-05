@@ -5,6 +5,13 @@ render Markdown with YAML frontmatter for downstream automation. **Now with
 Job Analysis and Resume Matching** to rank opportunities and get actionable
 insights.
 
+## Documentation
+
+- `docs/cli.md`: CLI commands and examples
+- `docs/configuration.md`: environment variables, file formats, rules, and windows
+- `docs/architecture.md`: pipeline stages and extension points (providers/filters/extractors)
+- `docs/troubleshooting.md`: common setup/runtime issues
+
 ## Why this exists
 
 - **Provider-agnostic**: Gmail is supported now, but the interface is designed
@@ -60,6 +67,12 @@ examples/
   sample_resume.json           # NEW
 ```
 
+## Requirements
+
+- Python 3.10+
+- Gmail provider: Google OAuth desktop credentials + Gmail API enabled
+- LLM features: optional OpenAI dependency + `OPENAI_API_KEY`
+
 ## Install (uv)
 
 ```
@@ -68,11 +81,30 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
+Install (pip):
+
+```
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+```
+
 Optional LLM support (OpenAI):
 
 ```
 uv pip install -e ".[llm]"
 ```
+
+## LLM setup (optional)
+
+LLM features (LLM filter, LLM extraction, job analysis, resume matching) use the
+OpenAI Python SDK. Set an API key via environment variable:
+
+```
+export OPENAI_API_KEY="..."
+```
+
+You can also choose the model via `--llm-model` (default: `gpt-4o-mini`).
 
 ## Gmail setup
 
@@ -80,6 +112,11 @@ uv pip install -e ".[llm]"
 2. Download `credentials.json` and place it in the repo root (or set
    `GMAIL_CREDENTIALS_PATH`).
 3. First run will open a browser to authorize and create `token.json`.
+
+Environment variables:
+
+- `GMAIL_CREDENTIALS_PATH`: path to OAuth client credentials JSON (default: `credentials.json`)
+- `GMAIL_TOKEN_PATH`: path to cached OAuth token JSON (default: `token.json`)
 
 ## Quick start
 
@@ -118,6 +155,12 @@ email-pipeline filter --in data/messages.json --out data/filtered.json \
   --rules examples/filter_rules.json
 ```
 
+Notes:
+
+- The rules file can be partial: only keys you provide override the built-in defaults.
+- Add `--analytics` to `filter` to write `filter_analytics.json` and a human-readable
+  `filter_analytics_report.txt` alongside the output file.
+
 ## Schema + Markdown
 
 The dedicated schema lives at `src/email_opportunity_pipeline/schemas/`.
@@ -127,6 +170,15 @@ take actions like:
 - ask clarifying questions (salary range, start date)
 - send tailored resumes
 - group conversations for auditing
+
+## Analytics
+
+There are two ways to produce analytics:
+
+- `email-pipeline run` writes `data/analytics.json` and `data/analytics_report.txt` by default
+  (disable with `--no-analytics`).
+- `email-pipeline analytics` generates analytics from existing artifacts (messages/opportunities),
+  useful for iterating on rule changes without refetching.
 
 ---
 
@@ -146,46 +198,7 @@ opportunities and prepare tailored applications.
 
 ### Resume Format
 
-Create your resume in JSON format (see `examples/sample_resume.json`) or Markdown:
-
-```json
-{
-  "personal": {
-    "name": "Your Name",
-    "email": "you@email.com",
-    "location": "City, State",
-    "summary": "Brief professional summary..."
-  },
-  "skills": {
-    "technical": [
-      { "name": "Python", "level": "expert", "years": 5 },
-      { "name": "AWS", "level": "advanced", "years": 3 }
-    ],
-    "soft": ["Leadership", "Communication"]
-  },
-  "experience": [
-    {
-      "title": "Senior Engineer",
-      "company": "Tech Corp",
-      "start_date": "2020-01",
-      "current": true,
-      "achievements": ["Led team of 5", "Built microservices platform"]
-    }
-  ],
-  "education": [
-    {
-      "degree": "BS",
-      "field": "Computer Science",
-      "institution": "University"
-    }
-  ],
-  "preferences": {
-    "remote_preference": "hybrid",
-    "salary_min": 150000,
-    "engagement_types": ["FULL_TIME"]
-  }
-}
-```
+Create your resume in JSON format (see `examples/sample_resume.json`) or Markdown.
 
 ### Quick Start - Matching
 
@@ -261,3 +274,9 @@ The match command generates:
 - The LLM filter and LLM extractor are **optional**. You can keep everything
   rule-based for predictable behavior.
 - Job Analysis and Resume Matching **require** the LLM optional dependency.
+
+## Troubleshooting
+
+If you hit setup issues, start with `docs/troubleshooting.md`. The most common
+issues are missing Gmail OAuth files (`credentials.json` / `token.json`) or an
+unset `OPENAI_API_KEY` when using LLM features.
