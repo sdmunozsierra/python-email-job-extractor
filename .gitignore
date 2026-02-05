@@ -144,6 +144,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# Email pipeline artifacts
+credentials.json
+token.json
+data/
+out/
+
 # Spyder project settings
 .spyderproject
 .spyproject
