@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "match_result",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "job_id": { "type": "string", "description": "Reference to the job opportunity (message_id)" },
+    "resume_id": { "type": ["string", "null"], "description": "Reference to the resume file or identifier" },
+    "timestamp": { "type": "string", "format": "date-time" },
+
+    "overall_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Overall match percentage"
+    },
+    "match_grade": {
+      "type": "string",
+      "enum": ["excellent", "good", "fair", "poor", "unqualified"],
+      "description": "Categorical match assessment"
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": ["strong_apply", "apply", "consider", "skip", "not_recommended"],
+      "description": "Action recommendation"
+    },
+
+    "category_scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skills_match": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "weight": { "type": "number", "default": 0.35 },
+            "mandatory_met": { "type": "number", "description": "Number of mandatory skills matched" },
+            "mandatory_total": { "type": "number", "description": "Total mandatory skills required" },
+            "preferred_met": { "type": "number" },
+            "preferred_total": { "type": "number" }
+          },
+          "required": ["score"]
+        },
+        "experience_match": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "weight": { "type": "number", "default": 0.30 },
+            "years_required": { "type": ["number", "null"] },
+            "years_candidate": { "type": ["number", "null"] },
+            "role_relevance": { "type": "string" }
+          },
+          "required": ["score"]
+        },
+        "education_match": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "weight": { "type": "number", "default": 0.15 },
+            "meets_requirements": { "type": "boolean" },
+            "notes": { "type": ["string", "null"] }
+          },
+          "required": ["score"]
+        },
+        "location_match": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "weight": { "type": "number", "default": 0.10 },
+            "compatible": { "type": "boolean" },
+            "notes": { "type": ["string", "null"] }
+          },
+          "required": ["score"]
+        },
+        "culture_fit": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "weight": { "type": "number", "default": 0.10 },
+            "notes": { "type": ["string", "null"] }
+          },
+          "required": ["score"]
+        }
+      }
+    },
+
+    "skills_analysis": {
+      "type": "object",
+      "properties": {
+        "matched_mandatory": { "type": "array", "items": { "type": "string" } },
+        "missing_mandatory": { "type": "array", "items": { "type": "string" } },
+        "matched_preferred": { "type": "array", "items": { "type": "string" } },
+        "missing_preferred": { "type": "array", "items": { "type": "string" } },
+        "bonus_skills": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Candidate skills that exceed job requirements or are highly valuable"
+        },
+        "transferable_skills": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Related skills that could compensate for missing ones"
+        }
+      }
+    },
+
+    "experience_analysis": {
+      "type": "object",
+      "properties": {
+        "relevant_positions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "company": { "type": "string" },
+              "relevance": { "type": "string", "enum": ["high", "medium", "low"] },
+              "key_achievements": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "experience_gaps": { "type": "array", "items": { "type": "string" } },
+        "career_progression_notes": { "type": ["string", "null"] }
+      }
+    },
+
+    "insights": {
+      "type": "object",
+      "properties": {
+        "strengths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key reasons why candidate is a good fit"
+        },
+        "concerns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Potential issues or gaps"
+        },
+        "opportunities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Growth opportunities this role offers"
+        },
+        "talking_points": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Suggested points to emphasize in application/interview"
+        },
+        "questions_to_ask": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Clarifying questions about the role"
+        }
+      }
+    },
+
+    "resume_tailoring": {
+      "type": "object",
+      "description": "Suggestions for customizing resume for this job",
+      "properties": {
+        "keywords_to_add": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Keywords from job posting to incorporate"
+        },
+        "skills_to_highlight": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Existing skills to emphasize"
+        },
+        "experience_to_emphasize": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Experiences most relevant to highlight"
+        },
+        "achievements_to_feature": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific achievements to make prominent"
+        },
+        "summary_suggestions": {
+          "type": ["string", "null"],
+          "description": "Suggested professional summary customization"
+        }
+      }
+    },
+
+    "application_strategy": {
+      "type": "object",
+      "properties": {
+        "approach": {
+          "type": "string",
+          "enum": ["direct_apply", "referral_preferred", "recruiter_contact", "networking_first"],
+          "description": "Recommended application approach"
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["immediate", "soon", "when_ready", "low_priority"]
+        },
+        "cover_letter_focus": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key points to address in cover letter"
+        },
+        "potential_objections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "objection": { "type": "string" },
+              "counter": { "type": "string" }
+            }
+          },
+          "description": "Anticipated concerns and how to address them"
+        }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "model_used": { "type": ["string", "null"] },
+        "analysis_version": { "type": ["string", "null"] },
+        "processing_time_ms": { "type": ["number", "null"] }
+      }
+    }
+  },
+  "required": [
+    "job_id",
+    "overall_score",
+    "match_grade",
+    "recommendation",
+    "category_scores",
+    "skills_analysis",
+    "insights"
+  ]
+}
