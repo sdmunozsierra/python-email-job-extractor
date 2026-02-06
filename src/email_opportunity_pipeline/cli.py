@@ -40,12 +40,113 @@ from .pipeline import (
 )
 from .providers.gmail import GmailProvider
 from .time_window import parse_window
+from .models import FilterOutcome
 
 
 def _build_provider(name: str):
     if name == "gmail":
         return GmailProvider()
     raise ValueError(f"Unknown provider: {name}")
+
+
+def _prompt_yes_no(prompt: str, default: bool = True) -> bool:
+    if default:
+        suffix = "[Y/n]"
+    else:
+        suffix = "[y/N]"
+    while True:
+        response = input(f"{prompt} {suffix} ").strip().lower()
+        if not response:
+            return default
+        if response in ("y", "yes"):
+            return True
+        if response in ("n", "no"):
+            return False
+        print("Please enter 'y' or 'n'.")
+
+
+def _parse_index_selection(raw: str, count: int) -> list[int]:
+    if count <= 0:
+        return []
+    cleaned = raw.strip().lower()
+    if cleaned in ("", "all", "*"):
+        return list(range(count))
+    if cleaned in ("none", "n"):
+        return []
+    selections: set[int] = set()
+    parts = [part.strip() for part in cleaned.split(",") if part.strip()]
+    for part in parts:
+        if "-" in part:
+            start_str, end_str = part.split("-", 1)
+            if not start_str or not end_str:
+                raise ValueError("Invalid range")
+            start = int(start_str)
+            end = int(end_str)
+            if start > end:
+                raise ValueError("Invalid range order")
+            for idx in range(start, end + 1):
+                selections.add(idx)
+        else:
+            selections.add(int(part))
+    for idx in selections:
+        if idx < 0 or idx >= count:
+            raise ValueError("Index out of range")
+    return sorted(selections)
+
+
+def _prompt_select(
+    items: list,
+    label: str,
+    render_item,
+    max_preview: int = 20,
+) -> list:
+    count = len(items)
+    if count == 0:
+        return []
+    print(f"\nInteractive selection: {label} ({count} total).")
+    preview_count = min(count, max_preview)
+    for i in range(preview_count):
+        print(f"  [{i}] {render_item(items[i])}")
+    if count > preview_count:
+        print(f"  ... {count - preview_count} more not shown")
+    print("Enter indexes (e.g. 0,2,5-7), 'all', or 'none'.")
+    while True:
+        try:
+            selection = input("Selection: ")
+            indexes = _parse_index_selection(selection, count)
+            return [items[i] for i in indexes]
+        except ValueError:
+            print("Invalid selection. Try again.")
+
+
+def _render_message_summary(message) -> str:
+    subject = (message.headers.subject or "").strip()
+    sender = (message.headers.from_ or "").strip()
+    snippet = (message.snippet or "").strip()
+    summary = " | ".join(part for part in [subject, sender, snippet] if part)
+    return summary[:160] if summary else "(no subject)"
+
+
+def _render_opportunity_summary(opportunity: dict) -> str:
+    title = (opportunity.get("job_title") or "Unknown").strip()
+    company = (opportunity.get("company") or "Unknown").strip()
+    location = (opportunity.get("location") or "").strip()
+    summary = " | ".join(part for part in [title, company, location] if part)
+    return summary[:160] if summary else "Unknown opportunity"
+
+
+def _render_match_summary_item(match_result) -> str:
+    score = f"{match_result.overall_score:.0f}"
+    grade = match_result.match_grade
+    rec = match_result.recommendation
+    job_id = match_result.job_id[:12]
+    return f"score={score} grade={grade} rec={rec} job_id={job_id}"
+
+
+def _render_draft_summary(draft) -> str:
+    title = getattr(draft, "job_title", "Unknown")
+    company = getattr(draft, "company", "Unknown")
+    return f"{title} at {company}"
 
 
 def _cmd_fetch(args: argparse.Namespace) -> None:
@@ -633,6 +734,7 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
 
     dry_run = not args.send
     llm_model = args.llm_model
+    interactive = args.interactive
 
     # ------------------------------------------------------------------
     # Computed paths
@@ -651,6 +753,9 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
     print(f"  EMAIL OPPORTUNITY PIPELINE -- FULL RUN ({mode_label})")
     print("=" * 64)
     print()
+    if interactive:
+        print("Interactive mode enabled: you can skip stages and select items.")
+        print()
 
     # ==================================================================
     # STAGE 1: Fetch
@@ -679,27 +784,60 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
         print("\nNo messages found. Pipeline complete (nothing to process).")
         return
 
+    if interactive and _prompt_yes_no("Select specific fetched emails?", default=False):
+        messages_list = _prompt_select(
+            messages_list,
+            "emails",
+            _render_message_summary,
+        )
+        write_messages(messages_path, messages_list)
+        if not messages_list:
+            print("\nNo messages selected. Pipeline complete.")
+            return
+
     # ==================================================================
     # STAGE 2: Filter
     # ==================================================================
-    print(f"[2/8 filter]  Filtering {len(messages_list)} messages...")
-    pipeline = build_filter_pipeline(
-        rules_path=args.rules or None,
-        use_llm=args.llm_filter,
-        llm_model=llm_model,
-    )
+    run_filter = True
+    if interactive:
+        run_filter = _prompt_yes_no("Run filter stage?", default=True)
 
     analytics = PipelineAnalytics()
     analytics.start()
     for msg in messages_list:
         analytics.record_email_fetch(msg)
 
-    filter_results = filter_messages_with_outcomes(pipeline, messages_list)
-    filtered_messages = []
-    for email, outcome in filter_results:
-        analytics.record_filter_result(email, outcome)
-        if outcome.passed:
-            filtered_messages.append(email)
+    if run_filter:
+        print(f"[2/8 filter]  Filtering {len(messages_list)} messages...")
+        pipeline = build_filter_pipeline(
+            rules_path=args.rules or None,
+            use_llm=args.llm_filter,
+            llm_model=llm_model,
+        )
+
+        filter_results = filter_messages_with_outcomes(pipeline, messages_list)
+        filtered_messages = []
+        for email, outcome in filter_results:
+            analytics.record_filter_result(email, outcome)
+            if outcome.passed:
+                filtered_messages.append(email)
+    else:
+        if filtered_path.exists():
+            filtered_messages = list(read_messages(filtered_path))
+            print(f"[2/8 filter]  Loaded {len(filtered_messages)} filtered messages from {filtered_path}")
+            for email in filtered_messages:
+                analytics.record_filter_result(
+                    email,
+                    FilterOutcome(passed=True, reasons=["interactive-skip"]),
+                )
+        else:
+            filtered_messages = list(messages_list)
+            print("[2/8 filter]  Skipped filtering; using all fetched messages.")
+            for email in filtered_messages:
+                analytics.record_filter_result(
+                    email,
+                    FilterOutcome(passed=True, reasons=["interactive-skip"]),
+                )
 
     write_messages(filtered_path, filtered_messages)
     print(f"[2/8 filter]  {len(filtered_messages)}/{len(messages_list)} passed -> {filtered_path}")
@@ -711,63 +849,131 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
         print("\nNo messages passed filtering. Pipeline complete.")
         return
 
+    if interactive and _prompt_yes_no("Select specific filtered emails?", default=False):
+        filtered_messages = _prompt_select(
+            filtered_messages,
+            "filtered emails",
+            _render_message_summary,
+        )
+        write_messages(filtered_path, filtered_messages)
+        if not filtered_messages:
+            analytics.finish()
+            save_analytics(analytics, work_dir / "analytics.json")
+            save_report(analytics, work_dir / "analytics_report.txt")
+            print("\nNo filtered emails selected. Pipeline complete.")
+            return
+
     # ==================================================================
     # STAGE 3: Extract
     # ==================================================================
-    print(f"[3/8 extract] Extracting opportunities...")
-    opportunities = extract_opportunities(
-        filtered_messages,
-        use_llm=args.llm_extract,
-        llm_model=llm_model,
-    )
-    for opp in opportunities:
-        analytics.record_extraction(opp)
+    run_extract = True
+    if interactive:
+        run_extract = _prompt_yes_no("Run extraction stage?", default=True)
 
-    write_opportunities(opportunities_path, opportunities)
-    analytics.finish()
-    save_analytics(analytics, work_dir / "analytics.json")
-    save_report(analytics, work_dir / "analytics_report.txt")
+    if run_extract:
+        print(f"[3/8 extract] Extracting opportunities...")
+        opportunities = extract_opportunities(
+            filtered_messages,
+            use_llm=args.llm_extract,
+            llm_model=llm_model,
+        )
+        for opp in opportunities:
+            analytics.record_extraction(opp)
 
-    # Render markdown
-    markdown_dir = out_dir / "markdown"
-    render_markdown_files(opportunities, markdown_dir)
-    print(f"[3/8 extract] {len(opportunities)} opportunities -> {opportunities_path}")
+        write_opportunities(opportunities_path, opportunities)
+        analytics.finish()
+        save_analytics(analytics, work_dir / "analytics.json")
+        save_report(analytics, work_dir / "analytics_report.txt")
+
+        # Render markdown
+        markdown_dir = out_dir / "markdown"
+        render_markdown_files(opportunities, markdown_dir)
+        print(f"[3/8 extract] {len(opportunities)} opportunities -> {opportunities_path}")
+    else:
+        if opportunities_path.exists():
+            opportunities = read_opportunities(opportunities_path)
+            analytics.finish()
+            save_analytics(analytics, work_dir / "analytics.json")
+            save_report(analytics, work_dir / "analytics_report.txt")
+            print(f"[3/8 extract] Loaded {len(opportunities)} opportunities from {opportunities_path}")
+        else:
+            analytics.finish()
+            save_analytics(analytics, work_dir / "analytics.json")
+            save_report(analytics, work_dir / "analytics_report.txt")
+            print("\nNo opportunities available (extract skipped). Pipeline complete.")
+            return
 
     if not opportunities:
         print("\nNo opportunities extracted. Pipeline complete.")
         return
 
+    if interactive and _prompt_yes_no("Select specific opportunities?", default=False):
+        opportunities = _prompt_select(
+            opportunities,
+            "opportunities",
+            _render_opportunity_summary,
+        )
+        write_opportunities(opportunities_path, opportunities)
+        if not opportunities:
+            print("\nNo opportunities selected. Pipeline complete.")
+            return
+
     # ==================================================================
     # STAGE 4: Analyze (LLM)
     # ==================================================================
-    print(f"[4/8 analyze] Analyzing {len(opportunities)} job(s) with LLM...")
-    analyzer = JobAnalyzer(model=llm_model)
-    analyses = []
-    for i, opp in enumerate(opportunities, 1):
-        title = opp.get("job_title", "Unknown")
-        company = opp.get("company", "Unknown")
-        print(f"              [{i}/{len(opportunities)}] {title} at {company}")
-        analysis = analyzer.analyze(opp)
-        analyses.append(analysis)
+    run_analyze = True
+    if interactive:
+        run_analyze = _prompt_yes_no("Run analyze stage?", default=True)
 
-    write_job_analyses(analyses_path, analyses)
-    print(f"[4/8 analyze] {len(analyses)} analyses -> {analyses_path}")
+    if run_analyze:
+        print(f"[4/8 analyze] Analyzing {len(opportunities)} job(s) with LLM...")
+        analyzer = JobAnalyzer(model=llm_model)
+        analyses = []
+        for i, opp in enumerate(opportunities, 1):
+            title = opp.get("job_title", "Unknown")
+            company = opp.get("company", "Unknown")
+            print(f"              [{i}/{len(opportunities)}] {title} at {company}")
+            analysis = analyzer.analyze(opp)
+            analyses.append(analysis)
+
+        write_job_analyses(analyses_path, analyses)
+        print(f"[4/8 analyze] {len(analyses)} analyses -> {analyses_path}")
+    else:
+        if analyses_path.exists():
+            analyses = read_job_analyses(analyses_path)
+            print(f"[4/8 analyze] Loaded {len(analyses)} analyses from {analyses_path}")
+        else:
+            analyses = None
+            print("[4/8 analyze] Skipped analyses; matching will run without them.")
 
     # ==================================================================
     # STAGE 5: Match resume (LLM)
     # ==================================================================
+    run_match = True
+    if interactive:
+        run_match = _prompt_yes_no("Run match stage?", default=True)
+
     resume = read_resume(args.resume)
-    print(f"[5/8 match]   Matching resume ({resume.personal.name}) against {len(opportunities)} jobs...")
 
-    matcher = ResumeMatcher(model=llm_model)
-    match_results = matcher.match_batch(resume, opportunities, analyses)
+    if run_match:
+        print(f"[5/8 match]   Matching resume ({resume.personal.name}) against {len(opportunities)} jobs...")
 
-    matches_dir.mkdir(parents=True, exist_ok=True)
-    write_match_results(match_results_path, match_results, resume_id=resume.source_file)
+        matcher = ResumeMatcher(model=llm_model)
+        match_results = matcher.match_batch(resume, opportunities, analyses)
 
-    summary_md = render_match_summary(match_results, opportunities)
-    (matches_dir / "match_summary.md").write_text(summary_md, encoding="utf-8")
-    print(f"[5/8 match]   {len(match_results)} match results -> {match_results_path}")
+        matches_dir.mkdir(parents=True, exist_ok=True)
+        write_match_results(match_results_path, match_results, resume_id=resume.source_file)
+
+        summary_md = render_match_summary(match_results, opportunities)
+        (matches_dir / "match_summary.md").write_text(summary_md, encoding="utf-8")
+        print(f"[5/8 match]   {len(match_results)} match results -> {match_results_path}")
+    else:
+        if match_results_path.exists():
+            match_results = read_match_results(match_results_path)
+            print(f"[5/8 match]   Loaded {len(match_results)} match results from {match_results_path}")
+        else:
+            print("\nNo match results available (match skipped). Pipeline complete.")
+            return
 
     # Apply filters for downstream stages
     selected = list(match_results)  # already sorted by score desc
@@ -785,6 +991,18 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
                                match_results, [], [], [], dry_run)
         return
 
+    if interactive and _prompt_yes_no("Select specific matches for tailoring/reply?", default=False):
+        selected = _prompt_select(
+            selected,
+            "match results",
+            _render_match_summary_item,
+        )
+        if not selected:
+            print("\nNo matches selected. Pipeline complete.")
+            _print_run_all_summary(messages_list, filtered_messages, opportunities,
+                                   match_results, [], [], [], dry_run)
+            return
+
     print(f"              Selected {len(selected)} job(s) for tailoring/reply "
           f"(min_score={args.min_score}, rec={args.recommendation}, top={args.top})")
 
@@ -798,88 +1016,136 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
     # ==================================================================
     # STAGE 6: Tailor resumes
     # ==================================================================
-    tailored_dir.mkdir(parents=True, exist_ok=True)
-    engine = TailoringEngine(output_dir=tailored_dir)
-    build_docx = not args.no_docx
+    run_tailor = True
+    if interactive:
+        run_tailor = _prompt_yes_no("Run tailoring stage?", default=True)
+
     tailored_resumes = []
+    if run_tailor:
+        tailored_dir.mkdir(parents=True, exist_ok=True)
+        engine = TailoringEngine(output_dir=tailored_dir)
+        build_docx = not args.no_docx
 
-    print(f"[6/8 tailor]  Tailoring resume for {len(selected)} job(s)...")
-    for i, mr in enumerate(selected, 1):
-        job = jobs_map.get(mr.job_id, {})
-        job_title = job.get("job_title", "Unknown")
-        company = job.get("company", "Unknown")
-        print(f"              [{i}/{len(selected)}] {job_title} at {company}")
-        try:
-            tailored = engine.tailor(resume, mr, job, build_docx=build_docx)
-            tailored_resumes.append(tailored)
+        print(f"[6/8 tailor]  Tailoring resume for {len(selected)} job(s)...")
+        for i, mr in enumerate(selected, 1):
+            job = jobs_map.get(mr.job_id, {})
+            job_title = job.get("job_title", "Unknown")
+            company = job.get("company", "Unknown")
+            print(f"              [{i}/{len(selected)}] {job_title} at {company}")
+            try:
+                tailored = engine.tailor(resume, mr, job, build_docx=build_docx)
+                tailored_resumes.append(tailored)
 
-            report_dir = tailored_dir / "tailoring_reports"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_tailoring_report(
-                report_dir / f"{mr.job_id}_report.json",
-                tailored.report.to_dict(),
-            )
-            md = render_tailoring_report(tailored.report)
-            (report_dir / f"{mr.job_id}_report.md").write_text(md, encoding="utf-8")
-            (report_dir / f"{mr.job_id}_resume.json").write_text(
-                _json.dumps(tailored.resume_data, indent=2), encoding="utf-8"
-            )
-        except Exception as e:
-            print(f"              Error tailoring: {e}")
+                report_dir = tailored_dir / "tailoring_reports"
+                report_dir.mkdir(parents=True, exist_ok=True)
+                write_tailoring_report(
+                    report_dir / f"{mr.job_id}_report.json",
+                    tailored.report.to_dict(),
+                )
+                md = render_tailoring_report(tailored.report)
+                (report_dir / f"{mr.job_id}_report.md").write_text(md, encoding="utf-8")
+                (report_dir / f"{mr.job_id}_resume.json").write_text(
+                    _json.dumps(tailored.resume_data, indent=2), encoding="utf-8"
+                )
+            except Exception as e:
+                print(f"              Error tailoring: {e}")
 
-    if tailored_resumes:
-        batch = [tr.to_dict() for tr in tailored_resumes]
-        write_tailoring_results(tailored_dir / "tailoring_results.json", batch)
-        summary = render_tailoring_summary(tailored_resumes)
-        (tailored_dir / "tailoring_summary.md").write_text(summary, encoding="utf-8")
+        if tailored_resumes:
+            batch = [tr.to_dict() for tr in tailored_resumes]
+            write_tailoring_results(tailored_dir / "tailoring_results.json", batch)
+            summary = render_tailoring_summary(tailored_resumes)
+            (tailored_dir / "tailoring_summary.md").write_text(summary, encoding="utf-8")
 
-    print(f"[6/8 tailor]  {len(tailored_resumes)} tailored resumes -> {tailored_dir}")
+        print(f"[6/8 tailor]  {len(tailored_resumes)} tailored resumes -> {tailored_dir}")
+    else:
+        print("[6/8 tailor]  Skipped tailoring.")
 
     # ==================================================================
     # STAGE 7: Compose reply emails
     # ==================================================================
-    if args.questionnaire:
-        questionnaire = read_questionnaire(args.questionnaire)
-        print(f"[7/8 compose] Loaded questionnaire from {args.questionnaire}")
+    run_compose = True
+    if interactive:
+        run_compose = _prompt_yes_no("Run compose stage?", default=True)
+
+    if run_compose:
+        if args.questionnaire:
+            questionnaire = read_questionnaire(args.questionnaire)
+            print(f"[7/8 compose] Loaded questionnaire from {args.questionnaire}")
+        else:
+            questionnaire = QuestionnaireConfig()
+            print("[7/8 compose] Using default questionnaire configuration")
+
+        # Build attachment map from tailored .docx files
+        attachment_map: dict = {}
+        for mr in selected:
+            job = jobs_map.get(mr.job_id, {})
+            company = job.get("company", "Unknown")
+            title = job.get("job_title", "Unknown")
+            safe_company = "".join(c for c in company if c.isalnum() or c in " _-").strip()
+            safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
+            docx_name = f"tailored_resume_{safe_company}_{safe_title}.docx".replace(" ", "_")
+            docx_path = tailored_dir / docx_name
+            if docx_path.exists():
+                attachment_map[mr.job_id] = [str(docx_path)]
+
+        composer = ReplyComposer(model=llm_model)
+        print(f"[7/8 compose] Composing {len(selected)} reply email(s) "
+              f"(LLM: {'yes' if composer.llm_available else 'template fallback'})...")
+
+        jobs_list = [jobs_map.get(mr.job_id, {}) for mr in selected]
+        drafts = composer.compose_batch(
+            resume=resume,
+            match_results=selected,
+            jobs=jobs_list,
+            questionnaire=questionnaire,
+            attachment_map=attachment_map,
+        )
+
+        replies_dir.mkdir(parents=True, exist_ok=True)
+        write_drafts(replies_dir / "drafts.json", drafts)
+        preview_md = render_batch_preview(drafts)
+        (replies_dir / "drafts_preview.md").write_text(preview_md, encoding="utf-8")
+        print(f"[7/8 compose] {len(drafts)} drafts -> {replies_dir / 'drafts.json'}")
     else:
-        questionnaire = QuestionnaireConfig()
-        print("[7/8 compose] Using default questionnaire configuration")
+        drafts_path = replies_dir / "drafts.json"
+        if drafts_path.exists():
+            drafts = read_drafts(drafts_path)
+            print(f"[7/8 compose] Loaded {len(drafts)} drafts from {drafts_path}")
+        else:
+            drafts = []
+            print("[7/8 compose] Skipped compose; no drafts available.")
 
-    # Build attachment map from tailored .docx files
-    attachment_map: dict = {}
-    for mr in selected:
-        job = jobs_map.get(mr.job_id, {})
-        company = job.get("company", "Unknown")
-        title = job.get("job_title", "Unknown")
-        safe_company = "".join(c for c in company if c.isalnum() or c in " _-").strip()
-        safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
-        docx_name = f"tailored_resume_{safe_company}_{safe_title}.docx".replace(" ", "_")
-        docx_path = tailored_dir / docx_name
-        if docx_path.exists():
-            attachment_map[mr.job_id] = [str(docx_path)]
-
-    composer = ReplyComposer(model=llm_model)
-    print(f"[7/8 compose] Composing {len(selected)} reply email(s) "
-          f"(LLM: {'yes' if composer.llm_available else 'template fallback'})...")
-
-    jobs_list = [jobs_map.get(mr.job_id, {}) for mr in selected]
-    drafts = composer.compose_batch(
-        resume=resume,
-        match_results=selected,
-        jobs=jobs_list,
-        questionnaire=questionnaire,
-        attachment_map=attachment_map,
-    )
-
-    replies_dir.mkdir(parents=True, exist_ok=True)
-    write_drafts(replies_dir / "drafts.json", drafts)
-    preview_md = render_batch_preview(drafts)
-    (replies_dir / "drafts_preview.md").write_text(preview_md, encoding="utf-8")
-    print(f"[7/8 compose] {len(drafts)} drafts -> {replies_dir / 'drafts.json'}")
+    if drafts and interactive and _prompt_yes_no("Select specific drafts for reply?", default=False):
+        drafts = _prompt_select(drafts, "drafts", _render_draft_summary)
+        write_drafts(replies_dir / "drafts.json", drafts)
 
     # ==================================================================
     # STAGE 8: Reply (dry-run or send)
     # ==================================================================
+    run_reply = True
+    if interactive:
+        run_reply = _prompt_yes_no("Run reply stage?", default=True)
+
+    if not run_reply:
+        print("[8/8 reply]   Skipped reply stage.")
+        reply_results = []
+        _print_run_all_summary(
+            messages_list, filtered_messages, opportunities,
+            match_results, selected, tailored_resumes, reply_results,
+            dry_run,
+        )
+        return
+
+    if not drafts:
+        print("[8/8 reply]   No drafts to send.")
+        reply_results = []
+        _print_run_all_summary(
+            messages_list, filtered_messages, opportunities,
+            match_results, selected, tailored_resumes, reply_results,
+            dry_run,
+        )
+        return
+
     reply_label = "DRY RUN" if dry_run else "SENDING"
     print(f"[8/8 reply]   {reply_label} {len(drafts)} email(s)...")
 
@@ -1602,6 +1868,11 @@ def main() -> None:
                                    help="Skip .docx generation")
     run_all_behaviour.add_argument("--llm-model", default="gpt-4o-mini",
                                    help="LLM model for all LLM stages (default: %(default)s)")
+    run_all_behaviour.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Enable interactive prompts to skip stages and select items",
+    )
 
     # -- Recipient override & audit --
     run_all_recipient = run_all.add_argument_group("recipient override and audit")

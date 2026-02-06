@@ -153,6 +153,8 @@ fetch -> filter -> extract -> analyze -> match -> tailor -> compose -> reply
 
 By default it runs in **dry-run mode** -- the entire pipeline executes but no
 emails are actually sent.  Pass `--send` to transmit for real.
+Add `--interactive` to step through each stage, skip parts of the pipeline,
+and manually select items before moving forward.
 
 **Dry-run (e2e testing):**
 
@@ -197,6 +199,17 @@ email-pipeline run-all \
   --min-score 70 --recommendation strong_apply,apply --top 5 \
   --llm-model gpt-4o-mini \
   --work-dir data --out-dir output
+```
+
+**Interactive mode (skip stages + select items):**
+
+```bash
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --provider gmail --window 2d \
+  --work-dir data --out-dir output \
+  --interactive
 ```
 
 #### Options
@@ -248,6 +261,7 @@ email-pipeline run-all \
 | `--send` | flag | off | Actually send emails (default is dry-run) |
 | `--no-docx` | flag | off | Skip `.docx` generation |
 | `--llm-model` | string | `gpt-4o-mini` | LLM model for all stages |
+| `--interactive` | flag | off | Prompt to skip stages and select items |
 
 **Recipient override and audit:**
 
