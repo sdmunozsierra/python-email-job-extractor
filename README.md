@@ -33,6 +33,9 @@ built-in dry-run mode for safe e2e testing before going live.
 - **Recruiter Reply**: Compose and send personalised reply emails to
   recruiters with LLM-generated content, questionnaire-driven topics
   (salary, location, interview questions), and tailored resume attachments.
+- **Opportunity Correlation**: Unified view linking every pipeline artifact
+  (email, opportunity, match result, tailored resume, reply) per job -- see
+  the complete lifecycle of each opportunity at a glance.
 - **One-command e2e**: `run-all` executes the entire pipeline from fetch
   through reply in a single invocation, with a built-in dry-run mode.
 
@@ -84,10 +87,16 @@ src/email_opportunity_pipeline/
     report.py              # Markdown reply report renderer
     sender.py              # Gmail send with dry-run and attachment support
     templates.py           # Prompt templates and fallback email builder
+  correlation/             # Job Opportunity Correlation
+    __init__.py
+    models.py              # CorrelatedOpportunity, CorrelationSummary
+    correlator.py          # OpportunityCorrelator engine
+    report.py              # Markdown correlation report renderer
   schemas/
     job_opportunity.schema.json
     resume.schema.json
     match_result.schema.json
+    correlation.schema.json
 vendor/
   resume-builder/          # Git subtree: .docx generation from JSON schema
     src/resume_builder/
@@ -474,6 +483,92 @@ email-pipeline reply \
   --drafts output/replies/drafts.json \
   --out output/replies
 ```
+
+---
+
+## Job Opportunity Correlation
+
+The `correlate` command creates a unified view that links every pipeline
+artifact (email, opportunity, match result, tailored resume, and reply) for
+each job opportunity.  This makes it easy to see exactly where each
+opportunity stands in the pipeline and review all related data at a glance.
+
+### Features
+
+- **Unified correlation**: Links emails, opportunities, match scores, tailored
+  resumes, and reply status for each job
+- **Auto-discovery**: Automatically finds artifacts from `--work-dir` and
+  `--out-dir` without specifying each file path
+- **Rich reports**: Markdown summary tables with score breakdowns, grade
+  distribution, and pipeline progress
+- **Individual cards**: Detailed per-opportunity Markdown cards with score bars,
+  skills analysis, timeline, and reply previews
+- **Flexible filtering**: Filter by match score, recommendation, pipeline
+  stage, or top-N
+- **JSON output**: Machine-readable correlation data for downstream processing
+
+### Quick Start - Correlation
+
+After running the main pipeline (or any subset of stages):
+
+```bash
+# Auto-discover artifacts from standard directories
+email-pipeline correlate \
+  --work-dir data \
+  --out-dir output \
+  --out correlation \
+  --individual-cards \
+  --full-report
+
+# Or specify explicit paths
+email-pipeline correlate \
+  --messages data/messages.json \
+  --opportunities data/opportunities.json \
+  --match-results output/matches/match_results.json \
+  --tailored-dir output/tailored \
+  --drafts output/replies/drafts.json \
+  --reply-results output/replies/reply_results.json \
+  --resume examples/sample_resume.json \
+  --out correlation
+```
+
+### Filtering
+
+```bash
+# Only top matches
+email-pipeline correlate \
+  --work-dir data --out-dir output --out correlation \
+  --min-score 70 --recommendation strong_apply,apply --top 10
+
+# Only opportunities that reached a specific stage
+email-pipeline correlate \
+  --work-dir data --out-dir output --out correlation \
+  --stage replied,tailored
+```
+
+### Correlation Output
+
+The `correlate` command generates:
+
+- `correlation.json` -- Full correlated data in JSON
+- `correlation_summary.md` -- Overview report with score tables and pipeline progress
+- `opportunity_cards/` -- Individual Markdown cards per opportunity (with `--individual-cards`)
+- `correlation_full_report.md` -- Single comprehensive report (with `--full-report`)
+
+### Pipeline Stages
+
+Each opportunity is tracked through these pipeline stages:
+
+| Stage | Icon | Description |
+|-------|------|-------------|
+| Fetched | 📬 | Email received from provider |
+| Filtered | 🔍 | Passed filtering rules |
+| Extracted | 📋 | Job opportunity extracted |
+| Analyzed | 🧪 | Job requirements analyzed |
+| Matched | 🎯 | Resume matched against job |
+| Tailored | ✂️ | Resume tailored for job |
+| Composed | ✉️ | Reply email drafted |
+| Replied | ✅ | Reply sent (or dry-run) |
 
 ---
 

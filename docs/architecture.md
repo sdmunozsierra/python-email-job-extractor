@@ -8,6 +8,8 @@ At a high level, the pipeline is:
   Fetch ──> Filter ──> Extract ──> Render
                                      │
                               Analyze/Match ──> Tailor ──> Compose ──> Reply
+                                                                        │
+                                                                   Correlate
 
   [  run-all  ──────────────────────────────────────────────────────────── ]
 ```
@@ -24,6 +26,7 @@ dry-run (default) or live send (`--send`) mode.
 7. **(Optional) Tailor**: Generate tailored `.docx` resumes using match insights + resume-builder.
 8. **(Optional) Compose**: LLM composes personalised recruiter reply emails from match insights + questionnaire.
 9. **(Optional) Reply**: Send or dry-run composed emails, with tailored resumes attached.
+10. **(Optional) Correlate**: Build a unified view linking all artifacts per opportunity.
 
 ## Key modules
 
@@ -35,6 +38,7 @@ dry-run (default) or live send (`--send`) mode.
 | Matching | `matching/` | Job analysis, resume matching, match reports |
 | Tailoring | `tailoring/` | Resume tailoring engine, adapter, change reporting |
 | Reply | `reply/` | Recruiter reply composer, sender, templates, reports |
+| Correlation | `correlation/` | Unified opportunity-email-resume correlation |
 | Schemas | `schemas/` | JSON schemas shipped with the package |
 | Pipeline | `pipeline.py` | Orchestration functions used by the CLI |
 | CLI | `cli.py` | `email-pipeline` command definitions |
@@ -267,6 +271,64 @@ Serialisable to/from JSON via `to_dict()` / `from_dict()`.
 
 ---
 
+## Correlation interfaces
+
+### OpportunityCorrelator (`correlation/correlator.py`)
+
+```python
+class OpportunityCorrelator:
+    def add_messages(self, messages: List[EmailMessage]) -> None: ...
+    def add_opportunities(self, opportunities: List[Dict]) -> None: ...
+    def add_match_results(self, results: List[MatchResult]) -> None: ...
+    def add_tailoring_results(self, results: List[Dict], tailored_dir: Optional[Path] = None) -> None: ...
+    def add_drafts(self, drafts: List[EmailDraft]) -> None: ...
+    def add_reply_results(self, results: List[ReplyResult]) -> None: ...
+    def correlate(self) -> List[CorrelatedOpportunity]: ...
+    def build_summary(self, correlated: List[CorrelatedOpportunity], resume_name: Optional[str] = None) -> CorrelationSummary: ...
+```
+
+Links all pipeline artifacts by their shared `job_id` / `message_id`. The
+`correlate()` method returns a list of `CorrelatedOpportunity` objects sorted
+by match score (highest first, unmatched last).
+
+### CorrelatedOpportunity (`correlation/models.py`)
+
+```python
+@dataclass
+class CorrelatedOpportunity:
+    job_id: str
+    job_title: str
+    company: str
+    stage: OpportunityStage          # fetched -> ... -> replied
+    pipeline_complete: bool
+    email: Optional[EmailSummary]    # source email
+    match: Optional[MatchSummary]    # match result
+    tailoring: Optional[TailoringSummary]  # tailored resume
+    reply: Optional[ReplySummary]    # reply status
+    # ... plus timeline, contact, locations
+```
+
+A unified view of a single job opportunity across the entire pipeline.
+Tracks pipeline progress through `OpportunityStage` and provides
+lightweight summaries of each linked artifact.
+
+### Report rendering (`correlation/report.py`)
+
+```python
+def render_correlation_summary(summary, correlated) -> str: ...
+def render_opportunity_card(c: CorrelatedOpportunity) -> str: ...
+def render_correlation_report(summary, correlated, include_cards=False) -> str: ...
+```
+
+Generates Markdown reports with:
+- Executive summary tables
+- Match score breakdowns with visual progress bars
+- Grade and recommendation distribution
+- Pipeline progress tracker with stage icons
+- Individual opportunity cards with full details
+
+---
+
 ## Vendor: resume-builder subtree
 
 The `vendor/resume-builder/` directory is a git subtree of the
@@ -345,6 +407,7 @@ Artifacts are JSON wrappers written by `io.py`:
 | Email drafts | `drafts: [EmailDraft.to_dict()]` | `write_drafts()` | `read_drafts()` |
 | Reply results | `reply_results: [ReplyResult.to_dict()]` | `write_reply_results()` | `read_reply_results()` |
 | Questionnaire | Direct dict | `write_questionnaire()` | `read_questionnaire()` |
+| Correlation | `correlated_opportunities: [...]` | `write_correlation()` | `read_correlation()` |
 
 All wrappers include a `created_at_utc` (or `fetched_at_utc`) timestamp and a
 `count` field. This makes artifacts easy to version, archive, and re-run
@@ -375,6 +438,11 @@ email-pipeline compose --> output/replies/
 email-pipeline reply  --> output/replies/
                              reply_results.json
                              reply_report.md
+email-pipeline correlate --> correlation/
+                               correlation.json
+                               correlation_summary.md
+                               opportunity_cards/<job_id>.md
+                               correlation_full_report.md
 ```
 
 ---
