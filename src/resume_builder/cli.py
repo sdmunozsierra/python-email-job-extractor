@@ -11,15 +11,90 @@ Usage (direct)::
 """
 
 import argparse
-
-import docx
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from collections import OrderedDict
 
 from resume_builder.person_builder import PersonBuilder
 from resume_builder.education_builder import EducationFactory
 from resume_builder.cert_builder import CertFactory
 from resume_builder.format_experience import format_experience, format_experience_skills
 from resume_builder.schema_adapter import ResumeSchemaAdapter
+from resume_builder.document_styles import (
+    create_styled_document,
+    add_name_heading,
+    add_job_title,
+    add_contact_line,
+    add_summary,
+    add_section_heading,
+    add_subsection_heading,
+    add_experience_header,
+    add_bullet_point,
+    add_tech_tags,
+    add_education_entry,
+    add_project_entry,
+    add_certifications_table,
+    add_activity_bullets,
+    add_inline_list,
+    add_preferences_section,
+    add_spacer,
+    create_skills_table,
+    Colors,
+    Fonts,
+)
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+
+# ---------------------------------------------------------------------------
+# Skill categorization helpers
+# ---------------------------------------------------------------------------
+
+# Friendly display names for skill categories
+_CATEGORY_LABELS = OrderedDict([
+    ("languages", "Programming Languages"),
+    ("frameworks", "Frameworks & Libraries"),
+    ("cloud", "Cloud Platforms"),
+    ("devops", "DevOps & Infrastructure"),
+    ("databases", "Databases"),
+    ("observability", "Observability & Monitoring"),
+    ("data", "Data Engineering"),
+    ("genai", "Generative AI"),
+    ("ml", "Machine Learning"),
+    ("api", "API & Integration"),
+    ("security", "Security"),
+    ("tools", "Tools & Platforms"),
+])
+
+
+def _group_skills_by_category(skills):
+    """Group Skill objects by their category, returning an OrderedDict of label → [name, ...]."""
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    uncategorized = []
+
+    for skill in skills:
+        cat = getattr(skill, "category", None)
+        name = getattr(skill, "name", str(skill))
+        if cat and cat in _CATEGORY_LABELS:
+            grouped[cat].append(name)
+        elif cat:
+            grouped[cat].append(name)
+        else:
+            uncategorized.append(name)
+
+    result = OrderedDict()
+    for key, label in _CATEGORY_LABELS.items():
+        if key in grouped:
+            result[label] = grouped[key]
+
+    # Any categories not in our predefined list
+    for key in sorted(grouped.keys()):
+        if key not in _CATEGORY_LABELS:
+            result[key.replace("_", " ").title()] = grouped[key]
+
+    if uncategorized:
+        result["Other"] = uncategorized
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -27,16 +102,14 @@ from resume_builder.schema_adapter import ResumeSchemaAdapter
 # ---------------------------------------------------------------------------
 
 def build_resume(person):
-    """Build a Word document from a Person object."""
-    doc = docx.Document()
+    """Build a polished Word document from a Person object."""
+    doc = create_styled_document()
 
-    # --- Header -----------------------------------------------------------
-    header = doc.add_heading(person.name or "Resume", level=1)
+    # === HEADER ============================================================
+    add_name_heading(doc, person.name or "Resume")
+
     if person.job_title:
-        header.add_run("\n" + person.job_title).bold = True
-    if person.summary:
-        p = doc.add_paragraph()
-        p.add_run(person.summary).italic = True
+        add_job_title(doc, person.job_title)
 
     # Contact info line
     contact_parts = []
@@ -53,75 +126,78 @@ def build_resume(person):
     if person.portfolio:
         contact_parts.append(person.portfolio)
     if contact_parts:
-        p = doc.add_paragraph()
-        p.add_run(" | ".join(contact_parts))
-    doc.add_paragraph()
+        add_contact_line(doc, contact_parts)
 
-    # --- Experience -------------------------------------------------------
-    doc.add_heading("Experience", level=2)
+    # Professional summary
+    if person.summary:
+        add_summary(doc, person.summary)
+
+    # === EXPERIENCE ========================================================
+    add_section_heading(doc, "Experience")
     format_experience(doc, person.experience)
-    doc.add_paragraph()
 
-    # --- Education --------------------------------------------------------
+    # === EDUCATION =========================================================
     if person.education:
-        doc.add_heading("Education", level=2)
+        add_section_heading(doc, "Education")
         for edu in person.education:
             title = getattr(edu, "display_title", None)
-            if title:
-                text = f"{title} — {edu.school_name}"
-            else:
-                text = f"{edu.major} — {edu.school_name}"
-            h = doc.add_heading(text, level=3)
-            p = doc.add_paragraph()
-            if edu.location:
-                p.add_run(f"Location: {edu.location}\n")
-            date_range = getattr(edu, "date_range", None) or getattr(edu, "dates", None)
-            if date_range:
-                p.add_run(f"Dates: {date_range}\n")
-            if edu.gpa:
-                p.add_run(f"GPA: {edu.gpa}\n")
-            if getattr(edu, "honors", None):
-                p.add_run(f"Honors: {edu.honors}\n")
-            coursework = edu.coursework
-            if coursework:
-                flat = []
-                for item in coursework:
-                    if isinstance(item, list):
-                        flat.extend(item)
-                    else:
-                        flat.append(item)
-                p.add_run("Coursework: ").bold = True
-                p.add_run(", ".join(str(c) for c in flat))
-        doc.add_paragraph()
+            if not title:
+                title = f"{edu.major}" if edu.major else ""
 
-    # --- Skills -----------------------------------------------------------
-    doc.add_heading("Skills", level=2)
+            institution = edu.school_name or ""
+            location = edu.location or ""
+            date_range = getattr(edu, "date_range", None) or getattr(edu, "dates", None) or ""
+
+            add_education_entry(
+                doc,
+                title=title,
+                institution=institution,
+                location=location,
+                date_range=date_range,
+                gpa=edu.gpa,
+                honors=getattr(edu, "honors", None),
+                coursework=edu.coursework,
+            )
+
+    # === SKILLS ============================================================
+    add_section_heading(doc, "Skills")
 
     # Experience-derived skills (legacy)
     has_project_skills = any(
         getattr(exp, "projects", None) for exp in person.experience
     )
     if has_project_skills:
-        doc.add_heading("Experience Skills", level=3)
+        add_subsection_heading(doc, "Experience Skills")
         format_experience_skills(doc, person.experience)
 
-    # Technical skills (A-z)
+    # Technical skills grouped by category
     if person.skills:
-        doc.add_heading("Technical Skills (A-z)", level=3)
-        arr = sorted(person.skills)
-        p = doc.add_paragraph()
-        p.add_run(", ".join(str(x) for x in arr))
+        # Check if skills are Skill objects with categories
+        has_categories = any(
+            getattr(s, "category", None) for s in person.skills
+        )
+        if has_categories:
+            add_subsection_heading(doc, "Technical Skills")
+            grouped = _group_skills_by_category(person.skills)
+            create_skills_table(doc, grouped)
+        else:
+            # Plain list (legacy) — sort alphabetically
+            add_subsection_heading(doc, "Technical Skills (A-Z)")
+            arr = sorted(person.skills)
+            add_inline_list(doc, arr)
 
     # Soft skills
     if person.soft_skills:
-        doc.add_heading("Soft Skills", level=3)
-        p = doc.add_paragraph()
-        p.add_run(", ".join(person.soft_skills))
+        add_spacer(doc, pts=2)
+        add_subsection_heading(doc, "Soft Skills")
+        # Display as bullet points for better readability
+        for skill in person.soft_skills:
+            add_bullet_point(doc, skill)
 
     # Spoken languages
     if person.languages:
-        doc.add_heading("Languages", level=3)
-        p = doc.add_paragraph()
+        add_spacer(doc, pts=2)
+        add_subsection_heading(doc, "Languages")
         lang_strs = []
         for lang in person.languages:
             if isinstance(lang, dict):
@@ -130,67 +206,37 @@ def build_resume(person):
                 )
             else:
                 lang_strs.append(str(lang))
-        p.add_run(", ".join(lang_strs))
+        add_inline_list(doc, lang_strs)
 
-    doc.add_paragraph()
-
-    # --- Projects (top-level) ---------------------------------------------
+    # === PROJECTS (top-level) ==============================================
     if person.projects:
-        doc.add_heading("Projects", level=2)
+        add_section_heading(doc, "Projects")
         for proj in person.projects:
-            doc.add_heading(proj.name, level=3)
-            p = doc.add_paragraph()
-            p.add_run(proj.description).italic = True
-            if proj.url:
-                p.add_run(f"\nURL: {proj.url}")
             bullets = getattr(proj, "all_bullets", proj.highlights or proj.actions)
-            for bullet in bullets:
-                p.add_run(f"\n- {bullet}")
             tech = getattr(proj, "all_tech", proj.technologies or proj.skills)
-            if tech:
-                p.add_run(f"\nTechnologies: {', '.join(tech)}")
-        doc.add_paragraph()
+            add_project_entry(
+                doc,
+                name=proj.name,
+                description=proj.description,
+                url=proj.url,
+                bullets=bullets,
+                technologies=tech,
+            )
 
-    # --- Activities -------------------------------------------------------
+    # === ACTIVITIES ========================================================
     if person.activities:
-        doc.add_heading("Activities", level=2)
-        p = doc.add_paragraph()
-        p.add_run(", ".join(str(x) for x in person.activities))
+        add_section_heading(doc, "Activities & Awards")
+        add_activity_bullets(doc, person.activities)
 
-    # --- Certifications ---------------------------------------------------
+    # === CERTIFICATIONS ====================================================
     if person.certifications:
-        doc.add_heading("Certifications", level=2)
-        table = doc.add_table(rows=1, cols=3)
-        hdr_cells = table.rows[0].cells
-        hdr_cells[0].text = "Name"
-        hdr_cells[1].text = "Issuer"
-        hdr_cells[2].text = "Date"
-        for cert in person.certifications:
-            row_cells = table.add_row().cells
-            row_cells[0].text = cert.title or ""
-            row_cells[1].text = cert.issuer or ""
-            row_cells[2].text = cert.completion_date or ""
+        add_section_heading(doc, "Certifications")
+        add_certifications_table(doc, person.certifications)
 
-    # --- Preferences ------------------------------------------------------
+    # === PREFERENCES =======================================================
     if person.preferences:
-        doc.add_heading("Preferences", level=2)
-        p = doc.add_paragraph()
-        prefs = person.preferences
-        if prefs.get("desired_roles"):
-            p.add_run("Desired Roles: ").bold = True
-            p.add_run(", ".join(prefs["desired_roles"]) + "\n")
-        if prefs.get("industries"):
-            p.add_run("Industries: ").bold = True
-            p.add_run(", ".join(prefs["industries"]) + "\n")
-        if prefs.get("locations"):
-            p.add_run("Locations: ").bold = True
-            p.add_run(", ".join(prefs["locations"]) + "\n")
-        if prefs.get("remote_preference"):
-            p.add_run("Remote Preference: ").bold = True
-            p.add_run(prefs["remote_preference"] + "\n")
-        if prefs.get("engagement_types"):
-            p.add_run("Engagement Types: ").bold = True
-            p.add_run(", ".join(prefs["engagement_types"]) + "\n")
+        add_section_heading(doc, "Preferences")
+        add_preferences_section(doc, person.preferences)
 
     return doc
 
