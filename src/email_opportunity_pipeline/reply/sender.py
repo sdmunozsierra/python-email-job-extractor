@@ -4,6 +4,25 @@ Email sender with dry-run support and attachment handling.
 Uses the Gmail API ``users.messages.send`` endpoint (requires the
 ``gmail.send`` scope).  In *dry-run* mode the email is formatted but
 never transmitted -- allowing the user to review the draft first.
+
+Recipient override & audit
+--------------------------
+The ``GmailSender`` supports three complementary features for
+controlling *who* receives the email:
+
+* **override_to** -- redirect *all* emails to a single address (useful
+  for testing or when a central mailbox should receive everything).
+  The original ``To`` address is preserved in
+  ``EmailDraft.original_to`` so reports still show the intended
+  recruiter.
+* **cc** -- one or more addresses added to the ``Cc`` header.
+* **bcc** -- one or more addresses added to the ``Bcc`` header.  These
+  appear in the MIME envelope so Gmail delivers them, but they are
+  *not* visible to the primary recipient.
+
+All three can also be set directly on the ``EmailDraft`` model (e.g. by
+loading a questionnaire) or via the CLI flags ``--override-to``,
+``--cc``, and ``--bcc``.
 """
 from __future__ import annotations
 
@@ -27,6 +46,7 @@ def _build_mime_message(draft: EmailDraft, from_address: str) -> MIMEMultipart:
 
     Handles:
     - Plain-text body (and optional HTML alternative)
+    - ``Cc`` / ``Bcc`` audit headers
     - ``In-Reply-To`` / ``References`` threading headers
     - File attachments with correct MIME types
     """
@@ -35,6 +55,12 @@ def _build_mime_message(draft: EmailDraft, from_address: str) -> MIMEMultipart:
     msg["To"] = draft.to
     msg["From"] = from_address
     msg["Subject"] = draft.subject
+
+    # CC / BCC
+    if draft.cc:
+        msg["Cc"] = ", ".join(draft.cc)
+    if draft.bcc:
+        msg["Bcc"] = ", ".join(draft.bcc)
 
     # Threading headers
     if draft.in_reply_to:
@@ -75,6 +101,45 @@ def _build_mime_message(draft: EmailDraft, from_address: str) -> MIMEMultipart:
         msg.attach(attachment)
 
     return msg
+
+
+def _apply_overrides(
+    draft: EmailDraft,
+    *,
+    override_to: Optional[str] = None,
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
+) -> EmailDraft:
+    """Return a (possibly modified) draft with recipient overrides applied.
+
+    * If *override_to* is given, ``draft.to`` is replaced and the
+      original address is saved in ``draft.original_to``.
+    * *cc* and *bcc* are **merged** with any values already on the draft
+      (de-duplicated).
+    """
+    if override_to and override_to != draft.to:
+        draft.original_to = draft.to
+        draft.to = override_to
+        logger.info(
+            "Recipient overridden: %s -> %s (job: %s at %s)",
+            draft.original_to, draft.to, draft.job_title, draft.company,
+        )
+
+    if cc:
+        existing = set(draft.cc)
+        for addr in cc:
+            if addr not in existing:
+                draft.cc.append(addr)
+                existing.add(addr)
+
+    if bcc:
+        existing = set(draft.bcc)
+        for addr in bcc:
+            if addr not in existing:
+                draft.bcc.append(addr)
+                existing.add(addr)
+
+    return draft
 
 
 class GmailSender:
@@ -145,6 +210,9 @@ class GmailSender:
         *,
         dry_run: bool = False,
         from_address: Optional[str] = None,
+        override_to: Optional[str] = None,
+        cc: Optional[List[str]] = None,
+        bcc: Optional[List[str]] = None,
     ) -> ReplyResult:
         """Send (or dry-run) a single email draft.
 
@@ -155,11 +223,28 @@ class GmailSender:
                 the returned ``ReplyResult``.
             from_address: Sender address override.  Defaults to the
                 authenticated Gmail user.
+            override_to: If set, **all** emails are sent to this address
+                instead of the original ``draft.to``.  The original
+                recipient is preserved in ``draft.original_to`` for
+                auditing.  Useful for testing or centralised mailboxes.
+            cc: Extra ``Cc`` addresses merged into the draft
+                (de-duplicated with any already present).
+            bcc: Extra ``Bcc`` addresses merged into the draft
+                (de-duplicated).  These are included in the MIME
+                envelope but hidden from the primary recipient.
 
         Returns:
             ``ReplyResult`` indicating success, failure, or dry-run status.
         """
         from_address = from_address or self.user_id
+
+        # Apply recipient overrides / audit addresses
+        draft = _apply_overrides(
+            draft,
+            override_to=override_to,
+            cc=cc,
+            bcc=bcc,
+        )
 
         if dry_run:
             # Build the MIME message for validation but don't send
@@ -192,8 +277,9 @@ class GmailSender:
 
             gmail_id = sent.get("id", "")
             logger.info(
-                "Sent reply to %s for %s at %s (Gmail ID: %s)",
+                "Sent reply to %s%s for %s at %s (Gmail ID: %s)",
                 draft.to,
+                f" (original: {draft.original_to})" if draft.original_to else "",
                 draft.job_title,
                 draft.company,
                 gmail_id,
@@ -218,6 +304,9 @@ class GmailSender:
         *,
         dry_run: bool = False,
         from_address: Optional[str] = None,
+        override_to: Optional[str] = None,
+        cc: Optional[List[str]] = None,
+        bcc: Optional[List[str]] = None,
     ) -> List[ReplyResult]:
         """Send (or dry-run) multiple email drafts.
 
@@ -225,12 +314,22 @@ class GmailSender:
             drafts: List of email drafts.
             dry_run: If ``True``, preview only.
             from_address: Optional sender address override.
+            override_to: Redirect all emails to this single address.
+            cc: Extra ``Cc`` addresses for every draft.
+            bcc: Extra ``Bcc`` addresses for every draft.
 
         Returns:
             List of ``ReplyResult`` objects.
         """
         results: List[ReplyResult] = []
         for draft in drafts:
-            result = self.send(draft, dry_run=dry_run, from_address=from_address)
+            result = self.send(
+                draft,
+                dry_run=dry_run,
+                from_address=from_address,
+                override_to=override_to,
+                cc=cc,
+                bcc=bcc,
+            )
             results.append(result)
         return results

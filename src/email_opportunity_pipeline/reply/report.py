@@ -22,6 +22,19 @@ def _status_icon(status: ReplyStatus) -> str:
     return mapping.get(status, "❓")
 
 
+def _render_recipient_lines(draft: EmailDraft) -> List[str]:
+    """Build Markdown lines showing To / CC / BCC (and original To if overridden)."""
+    lines: List[str] = []
+    lines.append(f"**To:** {draft.to}")
+    if draft.original_to:
+        lines.append(f"**Original To:** {draft.original_to} *(overridden)*")
+    if draft.cc:
+        lines.append(f"**CC:** {', '.join(draft.cc)}")
+    if draft.bcc:
+        lines.append(f"**BCC:** {', '.join(draft.bcc)}")
+    return lines
+
+
 def render_draft_preview(draft: EmailDraft) -> str:
     """Render a single email draft as a readable Markdown preview.
 
@@ -32,7 +45,7 @@ def render_draft_preview(draft: EmailDraft) -> str:
 
     lines.append(f"# Email Draft: {draft.job_title} at {draft.company}")
     lines.append("")
-    lines.append(f"**To:** {draft.to}")
+    lines.extend(_render_recipient_lines(draft))
     if draft.recruiter_name:
         lines.append(f"**Recruiter:** {draft.recruiter_name}")
     lines.append(f"**Subject:** {draft.subject}")
@@ -70,6 +83,12 @@ def render_batch_preview(drafts: List[EmailDraft]) -> str:
     lines.append("")
     lines.append(f"**Total drafts:** {len(drafts)}")
     lines.append(f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+
+    # Show global override/CC/BCC if all drafts share the same values
+    any_overridden = any(d.original_to for d in drafts)
+    if any_overridden:
+        lines.append(f"**Recipient Override Active**")
+
     lines.append("")
 
     # Summary table
@@ -79,9 +98,12 @@ def render_batch_preview(drafts: List[EmailDraft]) -> str:
     for i, d in enumerate(drafts, 1):
         score = f"{d.match_score:.0f}" if d.match_score is not None else "N/A"
         att_count = len(d.attachment_paths)
+        to_display = d.to[:30]
+        if d.original_to:
+            to_display = f"{d.to[:20]} *(was {d.original_to[:15]})*"
         lines.append(
             f"| {i} | {d.company[:20]} | {d.job_title[:30]} | "
-            f"{d.to[:30]} | {score} | {att_count} |"
+            f"{to_display} | {score} | {att_count} |"
         )
 
     lines.append("")
@@ -92,7 +114,7 @@ def render_batch_preview(drafts: List[EmailDraft]) -> str:
         lines.append("")
         lines.append(f"## Draft {i}: {d.job_title} at {d.company}")
         lines.append("")
-        lines.append(f"**To:** {d.to}")
+        lines.extend(_render_recipient_lines(d))
         lines.append(f"**Subject:** {d.subject}")
         lines.append("")
         lines.append("```")
@@ -157,7 +179,7 @@ def render_send_report(results: List[ReplyResult]) -> str:
         d = r.draft
         icon = _status_icon(r.status)
         lines.append(f"### {i}. {icon} {d.job_title} at {d.company}")
-        lines.append(f"**To:** {d.to}")
+        lines.extend(_render_recipient_lines(d))
         lines.append(f"**Subject:** {d.subject}")
         lines.append(f"**Status:** {r.status.value}")
         if r.gmail_message_id:

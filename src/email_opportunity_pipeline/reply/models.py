@@ -131,12 +131,28 @@ class EmailDraft:
     """A composed email draft ready for review or sending.
 
     May include file attachments (e.g. a tailored resume ``.docx``).
+
+    Recipient override & audit
+    --------------------------
+    * ``cc`` / ``bcc`` -- optional lists of addresses added at send time,
+      useful for auditing or keeping a manager in the loop.
+    * ``original_to`` -- when the recipient is overridden at send time
+      (e.g. via ``--override-to``), this field preserves the address that
+      was originally derived from the recruiter email so reports can show
+      both the intended and actual recipient.
     """
 
     to: str
     subject: str
     body_text: str
     body_html: Optional[str] = None
+
+    # CC / BCC for auditing
+    cc: List[str] = field(default_factory=list)
+    bcc: List[str] = field(default_factory=list)
+
+    # Preserved when recipient is overridden
+    original_to: Optional[str] = None
 
     # Threading headers (for replying in the same Gmail conversation)
     in_reply_to: Optional[str] = None   # original Message-ID header
@@ -161,6 +177,9 @@ class EmailDraft:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "to": self.to,
+            "cc": list(self.cc),
+            "bcc": list(self.bcc),
+            "original_to": self.original_to,
             "subject": self.subject,
             "body_text": self.body_text,
             "body_html": self.body_html,
@@ -180,6 +199,9 @@ class EmailDraft:
     def from_dict(cls, data: Dict[str, Any]) -> "EmailDraft":
         return cls(
             to=data.get("to", ""),
+            cc=data.get("cc", []) or [],
+            bcc=data.get("bcc", []) or [],
+            original_to=data.get("original_to"),
             subject=data.get("subject", ""),
             body_text=data.get("body_text", ""),
             body_html=data.get("body_html"),

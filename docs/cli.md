@@ -249,6 +249,16 @@ email-pipeline run-all \
 | `--no-docx` | flag | off | Skip `.docx` generation |
 | `--llm-model` | string | `gpt-4o-mini` | LLM model for all stages |
 
+**Recipient override and audit:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--override-to` | string | -- | Redirect **all** reply emails to this address |
+| `--cc` | string(s) | -- | One or more CC addresses for every reply email |
+| `--bcc` | string(s) | -- | One or more BCC addresses for every reply email |
+
+See the [`reply`](#reply) command for detailed examples and use cases.
+
 #### Output directory structure
 
 After a successful run, the output looks like:
@@ -547,6 +557,47 @@ email-pipeline reply \
 | `--out` | path | **required** | Output directory for results and report |
 | `--dry-run` | flag | off | Preview emails without sending |
 | `--index` | int | -- | Send only the draft at this index (0-based) |
+| `--override-to` | string | -- | Redirect **all** emails to this address (original is preserved in reports) |
+| `--cc` | string(s) | -- | One or more CC addresses added to every email |
+| `--bcc` | string(s) | -- | One or more BCC addresses added to every email |
+
+**Recipient override and audit:**
+
+The `--override-to`, `--cc`, and `--bcc` flags are designed for two key scenarios:
+
+1. **Testing / staging:** Use `--override-to you@example.com` to redirect all
+   outgoing emails to your own mailbox.  The original recruiter address is
+   preserved in reports (`original_to` field) so you can verify everything
+   looks correct before switching to live mode.
+
+2. **Audit trail / visibility:** Use `--bcc audit@yourcompany.com` to silently
+   copy every outgoing email to a compliance or audit mailbox, or use
+   `--cc manager@yourcompany.com` for visible copies.
+
+These flags are also available on `run-all`.
+
+**Examples:**
+
+```bash
+# Test: redirect all emails to yourself
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies \
+  --override-to test@example.com
+
+# Audit: BCC a compliance mailbox on every sent email
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies \
+  --bcc audit@example.com
+
+# Combine: override recipient + BCC audit
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies \
+  --override-to test@example.com \
+  --bcc audit@example.com compliance@example.com
+```
 
 **Outputs:**
 - `reply_results.json` -- machine-readable send results
