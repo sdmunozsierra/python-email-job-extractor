@@ -7,7 +7,7 @@ At a high level, the pipeline is:
 ```
   Fetch ──> Filter ──> Extract ──> Render
                                      │
-                              Analyze/Match ──> Tailor
+                              Analyze/Match ──> Tailor ──> Compose ──> Reply
 ```
 
 1. **Fetch**: A provider pulls recent messages into a normalized `EmailMessage` model.
@@ -17,6 +17,8 @@ At a high level, the pipeline is:
 5. **(Optional) Analyze**: LLM extracts structured job requirements.
 6. **(Optional) Match**: LLM matches a resume against opportunities, producing scored results.
 7. **(Optional) Tailor**: Generate tailored `.docx` resumes using match insights + resume-builder.
+8. **(Optional) Compose**: LLM composes personalised recruiter reply emails from match insights + questionnaire.
+9. **(Optional) Reply**: Send or dry-run composed emails, with tailored resumes attached.
 
 ## Key modules
 
@@ -27,6 +29,7 @@ At a high level, the pipeline is:
 | Extraction | `extraction/` | Rule-based + LLM extractors, Markdown renderer |
 | Matching | `matching/` | Job analysis, resume matching, match reports |
 | Tailoring | `tailoring/` | Resume tailoring engine, adapter, change reporting |
+| Reply | `reply/` | Recruiter reply composer, sender, templates, reports |
 | Schemas | `schemas/` | JSON schemas shipped with the package |
 | Pipeline | `pipeline.py` | Orchestration functions used by the CLI |
 | CLI | `cli.py` | `email-pipeline` command definitions |
@@ -204,6 +207,61 @@ Every change is tracked in a `TailoringReport`:
 
 ---
 
+## Reply interfaces
+
+### ReplyComposer (`reply/composer.py`)
+
+```python
+class ReplyComposer:
+    def compose(self, *, resume: Resume, match_result: MatchResult, job: Dict, questionnaire: QuestionnaireConfig, attachment_paths: Optional[List[str]] = None) -> EmailDraft: ...
+    def compose_batch(self, *, resume: Resume, match_results: List[MatchResult], jobs: List[Dict], questionnaire: QuestionnaireConfig, attachment_map: Optional[Dict[str, List[str]]] = None) -> List[EmailDraft]: ...
+```
+
+Uses an LLM to generate personalised recruiter reply emails.  The composer
+builds a system prompt from the `QuestionnaireConfig` (tone, length) and a
+user prompt from job context, match insights, and candidate strengths.
+
+When the LLM is unavailable (no `openai` package or API key), it falls back
+to a plain-text template (`reply/templates.py`).
+
+### GmailSender (`reply/sender.py`)
+
+```python
+class GmailSender:
+    def send(self, draft: EmailDraft, *, dry_run: bool = False, from_address: Optional[str] = None) -> ReplyResult: ...
+    def send_batch(self, drafts: List[EmailDraft], *, dry_run: bool = False, from_address: Optional[str] = None) -> List[ReplyResult]: ...
+```
+
+Sends emails via the Gmail API `users.messages.send` endpoint.  Handles:
+- MIME message construction (multipart with text body + attachments)
+- Threading headers (`In-Reply-To`, `References`)
+- Gmail thread ID for conversation threading
+- Dry-run mode (builds MIME but does not transmit)
+
+Requires OAuth credentials with `gmail.send` scope (see `config.py`
+`GMAIL_SEND_SCOPES`).
+
+### QuestionnaireConfig (`reply/models.py`)
+
+```python
+@dataclass
+class QuestionnaireConfig:
+    salary_range: Optional[str] = None
+    location_preference: Optional[str] = None
+    availability: Optional[str] = None
+    interview_process_questions: List[str] = field(default_factory=list)
+    custom_questions: List[str] = field(default_factory=list)
+    tone: ReplyTone = ReplyTone.PROFESSIONAL
+    max_length_words: int = 300
+    # ... plus salary_notes, relocation_notes, notice_period, visa_status,
+    #     include_* flags, extra_instructions
+```
+
+Controls what topics to include and how the LLM should compose the email.
+Serialisable to/from JSON via `to_dict()` / `from_dict()`.
+
+---
+
 ## Vendor: resume-builder subtree
 
 The `vendor/resume-builder/` directory is a git subtree of the
@@ -279,6 +337,9 @@ Artifacts are JSON wrappers written by `io.py`:
 | Job analyses | `analyses: [analysis dict]` | `write_job_analyses()` | `read_job_analyses()` |
 | Tailoring results | `tailoring_results: [TailoredResume.to_dict()]` | `write_tailoring_results()` | -- |
 | Tailoring report | Direct dict | `write_tailoring_report()` | -- |
+| Email drafts | `drafts: [EmailDraft.to_dict()]` | `write_drafts()` | `read_drafts()` |
+| Reply results | `reply_results: [ReplyResult.to_dict()]` | `write_reply_results()` | `read_reply_results()` |
+| Questionnaire | Direct dict | `write_questionnaire()` | `read_questionnaire()` |
 
 All wrappers include a `created_at_utc` (or `fetched_at_utc`) timestamp and a
 `count` field. This makes artifacts easy to version, archive, and re-run
@@ -302,6 +363,13 @@ email-pipeline tailor --> output/tailored/
                            tailoring_reports/<job_id>_report.md
                            tailoring_reports/<job_id>_resume.json
                            tailored_resume_<company>_<title>.docx
+email-pipeline compose --> output/replies/
+                             drafts.json
+                             drafts_preview.md
+                             previews/<job_id>_preview.md
+email-pipeline reply  --> output/replies/
+                             reply_results.json
+                             reply_report.md
 ```
 
 ---
