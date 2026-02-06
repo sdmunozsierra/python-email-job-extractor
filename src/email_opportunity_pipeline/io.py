@@ -302,3 +302,65 @@ def read_reply_results(path: str | Path) -> List["ReplyResult"]:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     results_data = raw.get("reply_results", []) or []
     return [ReplyResult.from_dict(r) for r in results_data]
+
+
+# =========================================================================
+# Correlation I/O
+# =========================================================================
+
+def write_correlation(
+    path: str | Path,
+    correlated: List[Any],
+    summary: Any,
+) -> None:
+    """Write correlation results to a JSON file.
+
+    Args:
+        path: Output path.
+        correlated: List of CorrelatedOpportunity objects (or dicts).
+        summary: CorrelationSummary object (or dict).
+    """
+    items = [
+        c.to_dict() if hasattr(c, "to_dict") else c for c in correlated
+    ]
+    summary_dict = summary.to_dict() if hasattr(summary, "to_dict") else summary
+    payload = {
+        "created_at_utc": _utc_now_iso(),
+        "count": len(items),
+        "summary": summary_dict,
+        "correlated_opportunities": items,
+    }
+    Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def read_correlation(path: str | Path) -> Tuple[List[Any], Any]:
+    """Read correlation results from a JSON file.
+
+    Args:
+        path: Path to the correlation JSON file.
+
+    Returns:
+        Tuple of (list of CorrelatedOpportunity, CorrelationSummary).
+    """
+    from .correlation.models import CorrelatedOpportunity, CorrelationSummary
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    items_data = raw.get("correlated_opportunities", []) or []
+    summary_data = raw.get("summary", {}) or {}
+
+    correlated = [CorrelatedOpportunity.from_dict(d) for d in items_data]
+    summary = CorrelationSummary.from_dict(summary_data)
+    return correlated, summary
+
+
+def read_tailoring_results(path: str | Path) -> List[Dict[str, Any]]:
+    """Read tailoring results from a JSON file.
+
+    Args:
+        path: Path to the tailoring results JSON file.
+
+    Returns:
+        List of tailoring result dicts.
+    """
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    return raw.get("tailoring_results", []) or []

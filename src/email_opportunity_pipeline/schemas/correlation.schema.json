@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "correlation_result",
+  "description": "Unified correlation of a job opportunity with its associated email, match result, tailored resume, and reply status.",
+  "type": "object",
+  "properties": {
+    "created_at_utc": { "type": "string", "format": "date-time" },
+    "count": { "type": "integer" },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total_opportunities": { "type": "integer" },
+        "resume_name": { "type": ["string", "null"] },
+        "resume_file": { "type": ["string", "null"] },
+        "by_stage": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "pipeline_complete_count": { "type": "integer" },
+        "match_statistics": {
+          "type": "object",
+          "properties": {
+            "matched_count": { "type": "integer" },
+            "avg_score": { "type": "number" },
+            "max_score": { "type": "number" },
+            "min_score": { "type": "number" }
+          }
+        },
+        "by_grade": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "by_recommendation": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "reply_statistics": {
+          "type": "object",
+          "properties": {
+            "drafted": { "type": "integer" },
+            "sent": { "type": "integer" },
+            "failed": { "type": "integer" },
+            "dry_run": { "type": "integer" }
+          }
+        },
+        "tailoring_statistics": {
+          "type": "object",
+          "properties": {
+            "tailored_count": { "type": "integer" },
+            "total_changes": { "type": "integer" },
+            "docx_generated": { "type": "integer" }
+          }
+        },
+        "top_companies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "company": { "type": "string" },
+              "count": { "type": "integer" }
+            }
+          }
+        },
+        "generated_at": { "type": ["string", "null"] }
+      }
+    },
+    "correlated_opportunities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "job_title": { "type": "string" },
+          "company": { "type": "string" },
+          "recruiter_name": { "type": ["string", "null"] },
+          "recruiter_email": { "type": ["string", "null"] },
+          "stage": {
+            "type": "string",
+            "enum": ["fetched", "filtered", "extracted", "analyzed", "matched", "tailored", "composed", "replied"]
+          },
+          "pipeline_complete": { "type": "boolean" },
+          "locations": { "type": "array", "items": { "type": "string" } },
+          "remote": { "type": ["boolean", "null"] },
+          "hybrid": { "type": ["boolean", "null"] },
+          "email": {
+            "type": ["object", "null"],
+            "properties": {
+              "message_id": { "type": "string" },
+              "thread_id": { "type": "string" },
+              "subject": { "type": "string" },
+              "from": { "type": "string" },
+              "date": { "type": "string" },
+              "snippet": { "type": "string" },
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "has_attachments": { "type": "boolean" }
+            }
+          },
+          "opportunity": { "type": ["object", "null"] },
+          "match": {
+            "type": ["object", "null"],
+            "properties": {
+              "overall_score": { "type": "number" },
+              "match_grade": { "type": "string" },
+              "recommendation": { "type": "string" },
+              "skills_score": { "type": "number" },
+              "experience_score": { "type": "number" },
+              "education_score": { "type": "number" },
+              "location_score": { "type": "number" },
+              "culture_fit_score": { "type": "number" },
+              "mandatory_skills_met": { "type": "integer" },
+              "mandatory_skills_total": { "type": "integer" },
+              "preferred_skills_met": { "type": "integer" },
+              "preferred_skills_total": { "type": "integer" },
+              "top_strengths": { "type": "array", "items": { "type": "string" } },
+              "top_concerns": { "type": "array", "items": { "type": "string" } },
+              "missing_skills": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "tailoring": {
+            "type": ["object", "null"],
+            "properties": {
+              "total_changes": { "type": "integer" },
+              "changes_by_category": {
+                "type": "object",
+                "additionalProperties": { "type": "integer" }
+              },
+              "docx_path": { "type": ["string", "null"] },
+              "resume_json_path": { "type": ["string", "null"] }
+            }
+          },
+          "reply": {
+            "type": ["object", "null"],
+            "properties": {
+              "to": { "type": "string" },
+              "subject": { "type": "string" },
+              "body_preview": { "type": "string" },
+              "has_attachments": { "type": "boolean" },
+              "attachment_count": { "type": "integer" },
+              "status": {
+                "type": "string",
+                "enum": ["not_started", "drafted", "dry_run", "sent", "failed"]
+              },
+              "gmail_message_id": { "type": ["string", "null"] },
+              "error": { "type": ["string", "null"] },
+              "sent_at": { "type": ["string", "null"] }
+            }
+          },
+          "timeline": {
+            "type": "object",
+            "properties": {
+              "email_received_at": { "type": ["string", "null"] },
+              "matched_at": { "type": ["string", "null"] },
+              "tailored_at": { "type": ["string", "null"] },
+              "replied_at": { "type": ["string", "null"] }
+            }
+          },
+          "artifact_paths": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "required": ["job_id", "stage"]
+      }
+    }
+  },
+  "required": ["created_at_utc", "count", "summary", "correlated_opportunities"]
+}

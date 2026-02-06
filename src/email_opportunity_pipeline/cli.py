@@ -23,10 +23,13 @@ from .io import (
     read_job_analyses,
     write_tailoring_report,
     write_tailoring_results,
+    read_tailoring_results,
     read_questionnaire,
     write_drafts,
     read_drafts,
     write_reply_results,
+    read_reply_results,
+    write_correlation,
 )
 from .pipeline import (
     build_filter_pipeline,
@@ -1171,6 +1174,248 @@ def _print_reply_summary(results: list, dry_run: bool) -> None:
         print("Remove --dry-run to actually send the emails.")
 
 
+# ============================================================================
+# Job Opportunity Correlation Command
+# ============================================================================
+
+def _cmd_correlate(args: argparse.Namespace) -> None:
+    """Correlate job opportunities with emails, resumes, and reply status.
+
+    Builds a unified view linking every pipeline artifact for each opportunity.
+    Supports auto-discovery of artifacts from standard work-dir / out-dir paths.
+    """
+    from .correlation import (
+        OpportunityCorrelator,
+        render_correlation_report,
+        render_opportunity_card,
+    )
+
+    correlator = OpportunityCorrelator()
+
+    work_dir = Path(args.work_dir) if args.work_dir else None
+    out_dir = Path(args.out_dir) if args.out_dir else None
+
+    # ------------------------------------------------------------------
+    # Load artifacts (explicit paths take priority over auto-discovery)
+    # ------------------------------------------------------------------
+
+    # Messages
+    messages_path = args.messages
+    if not messages_path and work_dir and (work_dir / "messages.json").exists():
+        messages_path = str(work_dir / "messages.json")
+    if messages_path:
+        messages = list(read_messages(messages_path))
+        correlator.add_messages(messages)
+        print(f"Loaded {len(messages)} messages from {messages_path}")
+
+    # Opportunities
+    opportunities_path = args.opportunities
+    if not opportunities_path and work_dir and (work_dir / "opportunities.json").exists():
+        opportunities_path = str(work_dir / "opportunities.json")
+    if opportunities_path:
+        opportunities = read_opportunities(opportunities_path)
+        correlator.add_opportunities(opportunities)
+        print(f"Loaded {len(opportunities)} opportunities from {opportunities_path}")
+
+    # Match results
+    match_path = args.match_results
+    if not match_path and out_dir and (out_dir / "matches" / "match_results.json").exists():
+        match_path = str(out_dir / "matches" / "match_results.json")
+    if match_path:
+        match_results = read_match_results(match_path)
+        correlator.add_match_results(match_results)
+        print(f"Loaded {len(match_results)} match results from {match_path}")
+
+    # Tailoring results
+    tailored_dir_path = args.tailored_dir
+    if not tailored_dir_path and out_dir and (out_dir / "tailored").exists():
+        tailored_dir_path = str(out_dir / "tailored")
+    if tailored_dir_path:
+        tailored_dir = Path(tailored_dir_path)
+        results_file = tailored_dir / "tailoring_results.json"
+        if results_file.exists():
+            tailoring_results = read_tailoring_results(results_file)
+            correlator.add_tailoring_results(tailoring_results, tailored_dir)
+            print(f"Loaded {len(tailoring_results)} tailoring results from {results_file}")
+
+    # Drafts
+    drafts_path = args.drafts
+    if not drafts_path and out_dir and (out_dir / "replies" / "drafts.json").exists():
+        drafts_path = str(out_dir / "replies" / "drafts.json")
+    if drafts_path:
+        drafts = read_drafts(drafts_path)
+        correlator.add_drafts(drafts)
+        print(f"Loaded {len(drafts)} drafts from {drafts_path}")
+
+    # Reply results
+    reply_path = args.reply_results
+    if not reply_path and out_dir and (out_dir / "replies" / "reply_results.json").exists():
+        reply_path = str(out_dir / "replies" / "reply_results.json")
+    if reply_path:
+        reply_results = read_reply_results(reply_path)
+        correlator.add_reply_results(reply_results)
+        print(f"Loaded {len(reply_results)} reply results from {reply_path}")
+
+    # ------------------------------------------------------------------
+    # Correlate
+    # ------------------------------------------------------------------
+
+    print("\nCorrelating artifacts...")
+    correlated = correlator.correlate()
+
+    if not correlated:
+        print("No opportunities found to correlate.")
+        return
+
+    # ------------------------------------------------------------------
+    # Filter
+    # ------------------------------------------------------------------
+
+    if args.min_score is not None:
+        correlated = [
+            c for c in correlated
+            if c.match and c.match.overall_score >= args.min_score
+        ]
+        print(f"After min-score filter ({args.min_score}): {len(correlated)}")
+
+    if args.recommendation:
+        recs = set(args.recommendation.split(","))
+        correlated = [
+            c for c in correlated
+            if c.match and c.match.recommendation in recs
+        ]
+        print(f"After recommendation filter: {len(correlated)}")
+
+    if args.stage:
+        stages = set(args.stage.split(","))
+        correlated = [c for c in correlated if c.stage.value in stages]
+        print(f"After stage filter: {len(correlated)}")
+
+    if args.top:
+        correlated = correlated[:args.top]
+
+    if not correlated:
+        print("No opportunities remain after filtering.")
+        return
+
+    # ------------------------------------------------------------------
+    # Load optional resume name for the summary
+    # ------------------------------------------------------------------
+
+    resume_name = None
+    resume_file = None
+    if args.resume:
+        try:
+            resume = read_resume(args.resume)
+            resume_name = resume.personal.name
+            resume_file = args.resume
+        except Exception:
+            resume_file = args.resume
+
+    # ------------------------------------------------------------------
+    # Build summary
+    # ------------------------------------------------------------------
+
+    summary = correlator.build_summary(
+        correlated,
+        resume_name=resume_name,
+        resume_file=resume_file,
+    )
+
+    # ------------------------------------------------------------------
+    # Output
+    # ------------------------------------------------------------------
+
+    out_path = Path(args.out)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # JSON
+    json_path = out_path / "correlation.json"
+    write_correlation(json_path, correlated, summary)
+    print(f"\nCorrelation data saved to {json_path}")
+
+    # Summary report
+    summary_path = out_path / "correlation_summary.md"
+    summary_md = render_correlation_report(summary, correlated, include_cards=False)
+    summary_path.write_text(summary_md, encoding="utf-8")
+    print(f"Summary report saved to {summary_path}")
+
+    # Individual cards
+    if args.individual_cards:
+        cards_dir = out_path / "opportunity_cards"
+        cards_dir.mkdir(parents=True, exist_ok=True)
+        for c in correlated:
+            card_md = render_opportunity_card(c)
+            safe_id = c.job_id.replace("/", "_").replace("\\", "_")[:60]
+            card_path = cards_dir / f"{safe_id}.md"
+            card_path.write_text(card_md, encoding="utf-8")
+        print(f"Individual cards saved to {cards_dir}")
+
+    # Full report (summary + cards in one file)
+    if args.full_report:
+        full_path = out_path / "correlation_full_report.md"
+        full_md = render_correlation_report(summary, correlated, include_cards=True)
+        full_path.write_text(full_md, encoding="utf-8")
+        print(f"Full report saved to {full_path}")
+
+    # ------------------------------------------------------------------
+    # Console summary
+    # ------------------------------------------------------------------
+
+    _print_correlation_summary(summary, correlated)
+
+
+def _print_correlation_summary(
+    summary: "CorrelationSummary",
+    correlated: list,
+) -> None:
+    """Print a brief correlation summary to console."""
+    print()
+    print("=" * 64)
+    print("  JOB OPPORTUNITY CORRELATION SUMMARY")
+    print("=" * 64)
+    print()
+
+    if summary.resume_name:
+        print(f"  Candidate:            {summary.resume_name}")
+    print(f"  Total Opportunities:  {summary.total_opportunities}")
+    print(f"  Matched:              {summary.matched_count}")
+    print(f"  Tailored Resumes:     {summary.tailored_count}")
+
+    replies_total = (
+        summary.replies_sent + summary.replies_dry_run
+        + summary.replies_drafted + summary.replies_failed
+    )
+    print(f"  Replies:              {replies_total}")
+    print(f"  Pipeline Complete:    {summary.pipeline_complete_count}")
+
+    if summary.matched_count > 0:
+        print()
+        print(f"  Avg Match Score:      {summary.avg_match_score:.1f} / 100")
+        print(f"  Best Score:           {summary.max_match_score:.1f} / 100")
+
+    # Top matches
+    top = [c for c in correlated if c.match][:5]
+    if top:
+        print()
+        print("  Top Matches:")
+        for i, c in enumerate(top, 1):
+            score = f"{c.match.overall_score:.0f}" if c.match else "--"
+            grade = c.match.match_grade if c.match else "--"
+            company = c.company[:25] if c.company else "Unknown"
+            title = c.job_title[:30] if c.job_title else "Unknown"
+            print(f"    {i}. [{score}] {grade.title():12s} {title} at {company}")
+
+    # Stage breakdown
+    if summary.by_stage:
+        print()
+        print("  Pipeline Stages:")
+        for stage, count in sorted(summary.by_stage.items()):
+            print(f"    {stage.title():12s} {count}")
+
+    print()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Email opportunity pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1535,6 +1780,116 @@ def main() -> None:
         help="Send only the draft at this index (0-based)"
     )
     reply.set_defaults(func=_cmd_reply)
+
+    # =========================================================================
+    # Correlation Command
+    # =========================================================================
+
+    correlate = subparsers.add_parser(
+        "correlate",
+        help="Correlate job opportunities with emails, resumes, and replies",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Build a unified correlation view that links every pipeline artifact\n"
+            "(email, opportunity, match result, tailored resume, reply) for each\n"
+            "job opportunity.  Generates a rich Markdown report and JSON data.\n"
+            "\n"
+            "Auto-discovery mode (simplest):\n"
+            "  email-pipeline correlate --work-dir data --out-dir output --out correlation\n"
+            "\n"
+            "Explicit paths:\n"
+            "  email-pipeline correlate \\\n"
+            "    --messages data/messages.json \\\n"
+            "    --opportunities data/opportunities.json \\\n"
+            "    --match-results output/matches/match_results.json \\\n"
+            "    --tailored-dir output/tailored \\\n"
+            "    --drafts output/replies/drafts.json \\\n"
+            "    --reply-results output/replies/reply_results.json \\\n"
+            "    --out correlation\n"
+        ),
+    )
+
+    # -- Auto-discovery paths --
+    correlate_auto = correlate.add_argument_group(
+        "auto-discovery",
+        "When provided, standard artifact paths are discovered automatically "
+        "under these directories (same layout as run-all output)."
+    )
+    correlate_auto.add_argument(
+        "--work-dir",
+        help="Work directory (contains messages.json, opportunities.json, etc.)"
+    )
+    correlate_auto.add_argument(
+        "--out-dir",
+        help="Output directory (contains matches/, tailored/, replies/)"
+    )
+
+    # -- Explicit artifact paths --
+    correlate_input = correlate.add_argument_group("explicit artifact paths")
+    correlate_input.add_argument(
+        "--messages",
+        help="Path to messages JSON file"
+    )
+    correlate_input.add_argument(
+        "--opportunities",
+        help="Path to opportunities JSON file"
+    )
+    correlate_input.add_argument(
+        "--match-results",
+        help="Path to match results JSON file"
+    )
+    correlate_input.add_argument(
+        "--tailored-dir",
+        help="Directory containing tailoring_results.json and .docx files"
+    )
+    correlate_input.add_argument(
+        "--drafts",
+        help="Path to drafts JSON file"
+    )
+    correlate_input.add_argument(
+        "--reply-results",
+        help="Path to reply results JSON file"
+    )
+    correlate_input.add_argument(
+        "--resume",
+        help="Path to resume file (for candidate name in reports)"
+    )
+
+    # -- Filtering --
+    correlate_filter = correlate.add_argument_group("filtering")
+    correlate_filter.add_argument(
+        "--min-score", type=float,
+        help="Only include opportunities with at least this match score"
+    )
+    correlate_filter.add_argument(
+        "--recommendation",
+        help="Comma-separated recommendations to include (e.g. strong_apply,apply)"
+    )
+    correlate_filter.add_argument(
+        "--stage",
+        help="Comma-separated pipeline stages to include (e.g. matched,tailored,replied)"
+    )
+    correlate_filter.add_argument(
+        "--top", type=int,
+        help="Limit to top N opportunities (by match score)"
+    )
+
+    # -- Output --
+    correlate_output = correlate.add_argument_group("output")
+    correlate_output.add_argument(
+        "--out", required=True,
+        help="Output directory for correlation results"
+    )
+    correlate_output.add_argument(
+        "--individual-cards", action="store_true",
+        help="Generate individual Markdown cards per opportunity"
+    )
+    correlate_output.add_argument(
+        "--full-report", action="store_true",
+        help="Generate a single comprehensive report with all cards included"
+    )
+
+    correlate.set_defaults(func=_cmd_correlate)
 
     args = parser.parse_args()
     args.func(args)
