@@ -31,6 +31,7 @@ email-pipeline <command> --help
 | `tailor` | Tailor a resume for jobs using match results | No* |
 | `compose` | Compose tailored recruiter reply emails | Optional |
 | `reply` | Send (or dry-run) composed reply emails | No |
+| `correlate` | Correlate opportunities with emails, resumes, and replies | No |
 
 \* The `tailor` command does not call the LLM itself but requires match results
 produced by the `match` command (which does). The `resume-builder` vendor
@@ -280,6 +281,13 @@ output/                         # --out-dir
     drafts_preview.md           # <-- review this before sending
     reply_results.json
     reply_report.md
+
+correlation/                    # email-pipeline correlate output
+  correlation.json
+  correlation_summary.md
+  opportunity_cards/            # with --individual-cards
+    <job_id>.md
+  correlation_full_report.md    # with --full-report
 ```
 
 ---
@@ -583,6 +591,94 @@ doc.save('my_resume.docx')
 
 ---
 
+## Job Opportunity Correlation
+
+### `correlate`
+
+Build a unified correlation view that links every pipeline artifact (email,
+opportunity, match result, tailored resume, reply) for each job opportunity.
+Generates rich Markdown reports and machine-readable JSON data.
+
+**Auto-discovery mode (simplest):**
+
+```bash
+email-pipeline correlate \
+  --work-dir data \
+  --out-dir output \
+  --out correlation \
+  --individual-cards \
+  --full-report
+```
+
+**Explicit paths:**
+
+```bash
+email-pipeline correlate \
+  --messages data/messages.json \
+  --opportunities data/opportunities.json \
+  --match-results output/matches/match_results.json \
+  --tailored-dir output/tailored \
+  --drafts output/replies/drafts.json \
+  --reply-results output/replies/reply_results.json \
+  --resume examples/sample_resume.json \
+  --out correlation
+```
+
+**With filtering:**
+
+```bash
+email-pipeline correlate \
+  --work-dir data --out-dir output \
+  --out correlation \
+  --min-score 70 --recommendation strong_apply,apply --top 10
+```
+
+#### Options
+
+**Auto-discovery:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--work-dir` | path | -- | Work directory (messages.json, opportunities.json, etc.) |
+| `--out-dir` | path | -- | Output directory (matches/, tailored/, replies/) |
+
+**Explicit artifact paths:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--messages` | path | -- | Path to messages JSON file |
+| `--opportunities` | path | -- | Path to opportunities JSON file |
+| `--match-results` | path | -- | Path to match results JSON file |
+| `--tailored-dir` | path | -- | Directory containing tailoring_results.json |
+| `--drafts` | path | -- | Path to drafts JSON file |
+| `--reply-results` | path | -- | Path to reply results JSON file |
+| `--resume` | path | -- | Resume file (for candidate name in reports) |
+
+**Filtering:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--min-score` | float | -- | Only include opportunities above this score |
+| `--recommendation` | string | -- | Comma-separated recommendations to include |
+| `--stage` | string | -- | Comma-separated pipeline stages to include |
+| `--top` | int | -- | Limit to top N opportunities by score |
+
+**Output:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--out` | path | **required** | Output directory for correlation results |
+| `--individual-cards` | flag | off | Generate per-opportunity Markdown cards |
+| `--full-report` | flag | off | Generate single comprehensive report with all cards |
+
+**Outputs:**
+- `correlation.json` -- Full correlated data in JSON
+- `correlation_summary.md` -- Overview report with score tables
+- `opportunity_cards/<job_id>.md` -- Individual cards (with `--individual-cards`)
+- `correlation_full_report.md` -- Single report with all cards (with `--full-report`)
+
+---
+
 ## End-to-end workflow
 
 ### One command (recommended)
@@ -677,4 +773,11 @@ email-pipeline reply \
 email-pipeline reply \
   --drafts output/replies/drafts.json \
   --out output/replies
+
+# 12. Correlate all artifacts (review full lifecycle)
+email-pipeline correlate \
+  --work-dir data --out-dir output \
+  --resume examples/sample_resume.json \
+  --out correlation \
+  --individual-cards --full-report
 ```
