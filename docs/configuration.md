@@ -22,10 +22,16 @@ LLM features use the OpenAI Python SDK. Provide credentials via:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | -- | Required for LLM commands (`analyze`, `match`, `--llm-filter`, `--llm-extract`) |
+| `OPENAI_API_KEY` | -- | Required for LLM commands (`analyze`, `match`, `compose`, `run-all`, `--llm-filter`, `--llm-extract`) |
 
 The CLI also supports choosing the model via `--llm-model` (default:
 `gpt-4o-mini`).
+
+### Gmail send scope
+
+The `reply` and `run-all --send` commands need the `gmail.send` OAuth scope
+in addition to `gmail.readonly`.  The first time you send, you may be prompted
+to re-authorise.  The token is cached in `token.json` as usual.
 
 ---
 
@@ -164,7 +170,9 @@ Most commands write a JSON wrapper object containing timestamps and counts:
 | `opportunities.json` | `{ created_at_utc, count, opportunities: [...] }` | `extract`, `run` | `render`, `analyze`, `match` |
 | `job_analyses.json` | `{ created_at_utc, count, analyses: [...] }` | `analyze` | `match` |
 | `match_results.json` | `{ created_at_utc, resume_id, count, match_results: [...] }` | `match` | `rank`, `tailor` |
-| `tailoring_results.json` | `{ created_at_utc, count, tailoring_results: [...] }` | `tailor` | -- |
+| `tailoring_results.json` | `{ created_at_utc, count, tailoring_results: [...] }` | `tailor`, `run-all` | -- |
+| `drafts.json` | `{ created_at_utc, count, drafts: [...] }` | `compose`, `run-all` | `reply` |
+| `reply_results.json` | `{ created_at_utc, count, reply_results: [...] }` | `reply`, `run-all` | -- |
 
 Markdown output is written as one file per opportunity using the source email
 message ID, e.g. `out/<message_id>.md`.

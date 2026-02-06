@@ -9,6 +9,7 @@ from .models import EmailMessage
 
 if TYPE_CHECKING:
     from .matching.models import Resume, MatchResult
+    from .reply.models import EmailDraft, QuestionnaireConfig, ReplyResult
 
 
 def _utc_now_iso() -> str:
@@ -204,3 +205,100 @@ def write_tailoring_results(
         "tailoring_results": results,
     }
     Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+# =========================================================================
+# Recruiter Reply I/O
+# =========================================================================
+
+def read_questionnaire(path: str | Path) -> "QuestionnaireConfig":
+    """Read a questionnaire config from a JSON file.
+
+    Args:
+        path: Path to the questionnaire JSON file.
+
+    Returns:
+        QuestionnaireConfig object.
+    """
+    from .reply.models import QuestionnaireConfig
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    return QuestionnaireConfig.from_dict(raw)
+
+
+def write_questionnaire(path: str | Path, config: "QuestionnaireConfig") -> None:
+    """Write a questionnaire config to a JSON file.
+
+    Args:
+        path: Output path.
+        config: QuestionnaireConfig to serialise.
+    """
+    Path(path).write_text(
+        json.dumps(config.to_dict(), indent=2),
+        encoding="utf-8",
+    )
+
+
+def write_drafts(path: str | Path, drafts: List["EmailDraft"]) -> None:
+    """Write a list of email drafts to a JSON file.
+
+    Args:
+        path: Output path.
+        drafts: List of EmailDraft objects.
+    """
+    payload = {
+        "created_at_utc": _utc_now_iso(),
+        "count": len(drafts),
+        "drafts": [d.to_dict() for d in drafts],
+    }
+    Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def read_drafts(path: str | Path) -> List["EmailDraft"]:
+    """Read email drafts from a JSON file.
+
+    Args:
+        path: Path to the drafts JSON file.
+
+    Returns:
+        List of EmailDraft objects.
+    """
+    from .reply.models import EmailDraft
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    drafts_data = raw.get("drafts", []) or []
+    return [EmailDraft.from_dict(d) for d in drafts_data]
+
+
+def write_reply_results(
+    path: str | Path,
+    results: List["ReplyResult"],
+) -> None:
+    """Write reply results (sent or dry-run) to a JSON file.
+
+    Args:
+        path: Output path.
+        results: List of ReplyResult objects.
+    """
+    payload = {
+        "created_at_utc": _utc_now_iso(),
+        "count": len(results),
+        "reply_results": [r.to_dict() for r in results],
+    }
+    Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def read_reply_results(path: str | Path) -> List["ReplyResult"]:
+    """Read reply results from a JSON file.
+
+    Args:
+        path: Path to the reply results JSON file.
+
+    Returns:
+        List of ReplyResult objects.
+    """
+    from .reply.models import ReplyResult
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    results_data = raw.get("reply_results", []) or []
+    return [ReplyResult.from_dict(r) for r in results_data]

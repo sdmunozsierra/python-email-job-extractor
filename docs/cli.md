@@ -18,16 +18,19 @@ email-pipeline <command> --help
 
 | Command | Description | LLM required |
 |---------|-------------|:------------:|
+| `run-all` | **Full e2e pipeline** (fetch through reply, dry-run default) | Yes |
 | `fetch` | Fetch emails from a provider | No |
 | `filter` | Filter emails by keyword rules | Optional |
 | `extract` | Extract opportunities to schema JSON | Optional |
 | `render` | Render Markdown from opportunities JSON | No |
-| `run` | Full pipeline (fetch + filter + extract + render) | Optional |
+| `run` | Basic pipeline (fetch + filter + extract + render) | Optional |
 | `analytics` | Generate analytics from existing data | No |
 | `analyze` | Extract structured requirements from jobs | Yes |
 | `match` | Match a resume against job opportunities | Yes |
 | `rank` | Filter and rank match results | No |
 | `tailor` | Tailor a resume for jobs using match results | No* |
+| `compose` | Compose tailored recruiter reply emails | Optional |
+| `reply` | Send (or dry-run) composed reply emails | No |
 
 \* The `tailor` command does not call the LLM itself but requires match results
 produced by the `match` command (which does). The `resume-builder` vendor
@@ -136,6 +139,148 @@ email-pipeline run \
 | `--out-dir` | path | `out` | Where Markdown files are written |
 | `--no-analytics` | flag | off | Disable analytics generation |
 | `--show-report` | flag | off | Print analytics report to stdout |
+
+---
+
+### `run-all`
+
+**Full end-to-end pipeline** that executes every stage in sequence:
+
+```
+fetch -> filter -> extract -> analyze -> match -> tailor -> compose -> reply
+```
+
+By default it runs in **dry-run mode** -- the entire pipeline executes but no
+emails are actually sent.  Pass `--send` to transmit for real.
+
+**Dry-run (e2e testing):**
+
+```bash
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --provider gmail --window 2d \
+  --work-dir data --out-dir output
+```
+
+**Send for real (production):**
+
+```bash
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --provider gmail --window 2d \
+  --work-dir data --out-dir output \
+  --send
+```
+
+**Skip fetch (re-use existing messages):**
+
+```bash
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --messages data/messages.json \
+  --work-dir data --out-dir output
+```
+
+**With filtering and LLM options:**
+
+```bash
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --provider gmail --window 7d \
+  --rules examples/filter_rules.json \
+  --llm-filter --llm-extract \
+  --min-score 70 --recommendation strong_apply,apply --top 5 \
+  --llm-model gpt-4o-mini \
+  --work-dir data --out-dir output
+```
+
+#### Options
+
+**Input sources:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--resume` | path | **required** | Candidate resume file (JSON or Markdown) |
+| `--questionnaire` | path | -- | Questionnaire config JSON (see `examples/questionnaire.json`) |
+| `--messages` | path | -- | Skip fetch; use an existing messages JSON file |
+
+**Fetch options** (ignored when `--messages` is set):
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--provider` | choice | `gmail` | Provider name |
+| `--window` | string | `1d` | Time window (`30m`, `6h`, `2d`) |
+| `--query` | string | `""` | Provider-specific query |
+| `--max-results` | int | unlimited | Cap fetched messages |
+
+**Filter and extraction:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--rules` | path | `""` | Path to filter rules JSON |
+| `--llm-filter` | flag | off | Enable LLM filter |
+| `--llm-extract` | flag | off | Enable LLM extraction |
+
+**Match selection** (which jobs to tailor and reply to):
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--min-score` | float | -- | Only tailor/reply for jobs above this score |
+| `--recommendation` | string | -- | Comma-separated recommendations (`strong_apply,apply`) |
+| `--top` | int | -- | Limit to top N matches by score |
+
+**Output:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--work-dir` | path | `data` | Where JSON artifacts are written |
+| `--out-dir` | path | `output` | Where reports, tailored resumes, and replies go |
+
+**Behaviour:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--send` | flag | off | Actually send emails (default is dry-run) |
+| `--no-docx` | flag | off | Skip `.docx` generation |
+| `--llm-model` | string | `gpt-4o-mini` | LLM model for all stages |
+
+#### Output directory structure
+
+After a successful run, the output looks like:
+
+```
+data/                           # --work-dir
+  messages.json
+  filtered.json
+  opportunities.json
+  job_analyses.json
+  analytics.json
+  analytics_report.txt
+
+output/                         # --out-dir
+  markdown/                     # rendered opportunity files
+    <message_id>.md
+  matches/
+    match_results.json
+    match_summary.md
+  tailored/
+    tailored_resume_<company>_<title>.docx
+    tailoring_results.json
+    tailoring_summary.md
+    tailoring_reports/
+      <job_id>_report.md
+      <job_id>_report.json
+      <job_id>_resume.json
+  replies/
+    drafts.json
+    drafts_preview.md           # <-- review this before sending
+    reply_results.json
+    reply_report.md
+```
 
 ---
 
@@ -299,6 +444,112 @@ email-pipeline tailor \
 
 ---
 
+## Recruiter Reply
+
+### `compose`
+
+Compose tailored reply emails to recruiters using LLM-powered personalisation.
+Generates email drafts that incorporate match insights, candidate strengths,
+and user-defined questionnaire topics (salary, location, interview process, etc.).
+
+```bash
+email-pipeline compose \
+  --resume examples/sample_resume.json \
+  --match-results out/matches/match_results.json \
+  --opportunities data/opportunities.json \
+  --questionnaire examples/questionnaire.json \
+  --tailored-dir output/tailored \
+  --out output/replies \
+  --recommendation strong_apply,apply \
+  --top 5
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--resume` | path | **required** | Candidate resume file (JSON or Markdown) |
+| `--match-results` | path | **required** | Match results JSON (from `match`) |
+| `--opportunities` | path | -- | Opportunities JSON (for recruiter contact info) |
+| `--questionnaire` | path | -- | Questionnaire config JSON (salary, location, etc.) |
+| `--tailored-dir` | path | -- | Directory with tailored `.docx` resumes to attach |
+| `--out` | path | **required** | Output directory for drafts and previews |
+| `--min-score` | float | -- | Only compose for jobs above this score |
+| `--recommendation` | string | -- | Comma-separated recommendations to filter |
+| `--top` | int | -- | Limit to top N results by score |
+| `--llm-model` | string | `gpt-4o-mini` | LLM model for email composition |
+
+**Outputs:**
+- `drafts.json` -- all email drafts in machine-readable format
+- `drafts_preview.md` -- batch preview report (Markdown)
+- `previews/<job_id>_preview.md` -- individual draft previews
+
+When no `--questionnaire` is provided, a default configuration is used.  When
+the LLM is unavailable (no `openai` package or API key), a plain-text template
+is used as a fallback.
+
+#### Questionnaire config
+
+The questionnaire JSON controls which topics to include and how the LLM should
+write the reply.  See `examples/questionnaire.json` for the full schema:
+
+```json
+{
+  "salary_range": "$180,000 - $220,000 USD",
+  "location_preference": "Remote or hybrid in SF Bay Area",
+  "availability": "Available in 2-3 weeks",
+  "interview_process_questions": [
+    "How many interview rounds?",
+    "Is there a take-home project?"
+  ],
+  "custom_questions": [
+    "What does a typical day look like?"
+  ],
+  "tone": "professional",
+  "max_length_words": 300
+}
+```
+
+Available tones: `professional`, `enthusiastic`, `casual`, `concise`.
+
+---
+
+### `reply`
+
+Send (or dry-run preview) previously composed email drafts.
+
+**Dry-run (preview without sending):**
+
+```bash
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies \
+  --dry-run
+```
+
+**Actually send:**
+
+```bash
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--drafts` | path | **required** | Drafts JSON file (from `compose`) |
+| `--out` | path | **required** | Output directory for results and report |
+| `--dry-run` | flag | off | Preview emails without sending |
+| `--index` | int | -- | Send only the draft at this index (0-based) |
+
+**Outputs:**
+- `reply_results.json` -- machine-readable send results
+- `reply_report.md` -- Markdown report of what was sent / previewed
+
+**Note:** Sending requires OAuth credentials with the `gmail.send` scope.
+The first time you send, you may be prompted to re-authorise your Google
+account to grant the send permission.
+
+---
+
 ## resume-builder (vendor CLI)
 
 The vendor `resume-builder` package provides a standalone CLI for generating
@@ -334,7 +585,37 @@ doc.save('my_resume.docx')
 
 ## End-to-end workflow
 
-A typical complete workflow:
+### One command (recommended)
+
+The `run-all` command runs every stage in a single invocation.  By default it
+operates in **dry-run mode** so nothing is sent:
+
+```bash
+# 1. Dry-run -- fetch, filter, extract, analyze, match, tailor, compose, preview
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --provider gmail --window 2d \
+  --min-score 70 --recommendation strong_apply,apply --top 5 \
+  --work-dir data --out-dir output
+
+# 2. Review output/replies/drafts_preview.md
+
+# 3. Send for real (once you are satisfied)
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --messages data/messages.json \
+  --min-score 70 --recommendation strong_apply,apply --top 5 \
+  --work-dir data --out-dir output --send
+```
+
+The second invocation uses `--messages data/messages.json` to skip
+refetching and reuse the cached messages from step 1.
+
+### Step-by-step (advanced)
+
+If you need more control over individual stages:
 
 ```bash
 # 1. Fetch emails
@@ -374,4 +655,26 @@ email-pipeline tailor \
   --out output/tailored \
   --recommendation strong_apply,apply \
   --top 5
+
+# 9. Compose recruiter reply emails (LLM)
+email-pipeline compose \
+  --resume examples/sample_resume.json \
+  --match-results out/matches/match_results.json \
+  --opportunities data/opportunities.json \
+  --questionnaire examples/questionnaire.json \
+  --tailored-dir output/tailored \
+  --out output/replies \
+  --recommendation strong_apply,apply \
+  --top 5
+
+# 10. Review drafts (dry run)
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies \
+  --dry-run
+
+# 11. Send emails to recruiters
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies
 ```

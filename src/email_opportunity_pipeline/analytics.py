@@ -226,25 +226,68 @@ class PipelineAnalytics:
                         self.failed_scores.append(score)
 
     def record_extraction(self, opportunity: Dict[str, Any]) -> None:
-        """Record metrics for an extracted opportunity."""
+        """Record metrics for an extracted opportunity.
+
+        Handles both flat schema (``"company": "Acme"``) produced by the
+        extractors and nested schema (``"company": {"name": "Acme"}``)
+        that was originally assumed.
+        """
         self.total_opportunities_extracted += 1
-        
-        company = opportunity.get("company", {}) or {}
-        if company.get("name"):
+
+        # --- Company ---
+        company_raw = opportunity.get("company")
+        company_name: str = ""
+        if isinstance(company_raw, str) and company_raw:
+            company_name = company_raw
+        elif isinstance(company_raw, dict):
+            company_name = company_raw.get("name", "") or ""
+
+        if company_name:
             self.opportunities_with_company += 1
-            self.company_counts[company["name"]] += 1
-        
-        role = opportunity.get("role", {}) or {}
-        if role.get("title"):
+            self.company_counts[company_name] += 1
+
+        # --- Role / job title ---
+        role_raw = opportunity.get("job_title") or opportunity.get("role")
+        role_title: str = ""
+        if isinstance(role_raw, str) and role_raw:
+            role_title = role_raw
+        elif isinstance(role_raw, dict):
+            role_title = role_raw.get("title", "") or ""
+
+        if role_title:
             self.opportunities_with_role += 1
-            self.role_counts[role["title"]] += 1
-        
-        compensation = opportunity.get("compensation", {}) or {}
-        if compensation.get("base_salary") or compensation.get("salary_range"):
+            self.role_counts[role_title] += 1
+
+        # --- Compensation ---
+        has_salary = False
+        compensation = opportunity.get("compensation")
+        if isinstance(compensation, dict):
+            has_salary = bool(
+                compensation.get("base_salary") or compensation.get("salary_range")
+            )
+        # Also check engagement_options (flat schema)
+        for opt in opportunity.get("engagement_options", []) or []:
+            pay = opt.get("pay") if isinstance(opt, dict) else None
+            if isinstance(pay, dict) and (pay.get("min") or pay.get("max")):
+                has_salary = True
+                break
+        if has_salary:
             self.opportunities_with_salary += 1
-        
-        location = opportunity.get("location", {}) or {}
-        if location.get("city") or location.get("state") or location.get("remote"):
+
+        # --- Location ---
+        has_location = False
+        location = opportunity.get("location")
+        if isinstance(location, dict):
+            has_location = bool(
+                location.get("city") or location.get("state") or location.get("remote")
+            )
+        # Flat schema uses "locations" list and "remote" bool
+        locations_list = opportunity.get("locations")
+        if isinstance(locations_list, list) and locations_list:
+            has_location = True
+        if opportunity.get("remote") or opportunity.get("hybrid"):
+            has_location = True
+        if has_location:
             self.opportunities_with_location += 1
 
     def _extract_domain(self, from_header: str) -> str:

@@ -1,13 +1,13 @@
 # Email Opportunity Pipeline
 
 Fetch, filter, and normalize email job opportunities into a JSON schema, then
-render Markdown with YAML frontmatter for downstream automation. **Now with
-Job Analysis, Resume Matching, and Resume Tailoring** to rank opportunities,
-get actionable insights, and generate tailored `.docx` resumes.
+rank them against your resume, generate tailored `.docx` resumes, and **send
+personalised reply emails to recruiters** -- all in a single command with a
+built-in dry-run mode for safe e2e testing before going live.
 
 ## Documentation
 
-- `docs/cli.md`: CLI commands and examples
+- `docs/cli.md`: CLI commands and examples (including `run-all` quickstart)
 - `docs/configuration.md`: environment variables, file formats, rules, and windows
 - `docs/architecture.md`: pipeline stages, interfaces, vendor integration, and extension points
 - `docs/troubleshooting.md`: common setup/runtime issues
@@ -30,6 +30,11 @@ get actionable insights, and generate tailored `.docx` resumes.
 - **Resume Tailoring**: Automatically generate tailored `.docx` resumes per
   job, emphasizing relevant skills, reordering experience, and tracking every
   change in a detailed report.
+- **Recruiter Reply**: Compose and send personalised reply emails to
+  recruiters with LLM-generated content, questionnaire-driven topics
+  (salary, location, interview questions), and tailored resume attachments.
+- **One-command e2e**: `run-all` executes the entire pipeline from fetch
+  through reply in a single invocation, with a built-in dry-run mode.
 
 ## Project layout
 
@@ -72,6 +77,13 @@ src/email_opportunity_pipeline/
     engine.py              # Tailoring engine (apply match insights)
     models.py              # TailoredResume, TailoringReport, TailoringChange
     report.py              # Markdown tailoring report renderer
+  reply/                   # Recruiter Reply (compose + send emails)
+    __init__.py
+    composer.py            # LLM-powered email composition
+    models.py              # QuestionnaireConfig, EmailDraft, ReplyResult
+    report.py              # Markdown reply report renderer
+    sender.py              # Gmail send with dry-run and attachment support
+    templates.py           # Prompt templates and fallback email builder
   schemas/
     job_opportunity.schema.json
     resume.schema.json
@@ -86,6 +98,7 @@ vendor/
 examples/
   filter_rules.json
   sample_resume.json
+  questionnaire.json           # Reply preferences (salary, location, questions)
 docs/
   architecture.md
   cli.md
@@ -158,13 +171,48 @@ Environment variables:
 
 ## Quick start
 
-Fetch the last 24 hours:
+### Full pipeline in one command (recommended)
+
+The `run-all` command executes every stage -- from email fetch through
+recruiter reply -- in a single invocation.  **It runs in dry-run mode by
+default**, so no emails are sent until you explicitly opt in.
 
 ```bash
-email-pipeline fetch --provider gmail --window 1d --out data/messages.json
+# 1. Set up credentials
+export OPENAI_API_KEY="sk-..."        # required for LLM stages
+# Place credentials.json in repo root  # Gmail OAuth (see "Gmail setup")
+
+# 2. Edit your preferences
+cp examples/questionnaire.json my_questionnaire.json
+# ... edit salary, location, questions, tone ...
+
+# 3. Dry-run the full pipeline (safe -- nothing is sent)
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire my_questionnaire.json \
+  --provider gmail --window 2d \
+  --min-score 70 --recommendation strong_apply,apply --top 5 \
+  --work-dir data --out-dir output
+
+# 4. Review the drafts
+#    Open output/replies/drafts_preview.md to inspect every email.
+
+# 5. Send for real (when satisfied)
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire my_questionnaire.json \
+  --messages data/messages.json \
+  --min-score 70 --recommendation strong_apply,apply --top 5 \
+  --work-dir data --out-dir output \
+  --send
 ```
 
-Run the full pipeline:
+Step 5 uses `--messages data/messages.json` to skip refetching (the messages
+were already cached in step 3).
+
+### Basic pipeline (fetch + filter + extract only)
+
+If you only need to fetch and extract opportunities without matching/replying:
 
 ```bash
 email-pipeline run \
@@ -174,7 +222,7 @@ email-pipeline run \
   --work-dir data
 ```
 
-Step-by-step:
+### Step-by-step (individual commands)
 
 ```bash
 email-pipeline fetch --provider gmail --window 6h --out data/messages.json
@@ -182,6 +230,9 @@ email-pipeline filter --in data/messages.json --out data/filtered.json
 email-pipeline extract --in data/filtered.json --out data/opportunities.json
 email-pipeline render --in data/opportunities.json --out out
 ```
+
+See `docs/cli.md` for the full command reference including `analyze`, `match`,
+`rank`, `tailor`, `compose`, and `reply`.
 
 ## Filter rules
 
@@ -352,6 +403,80 @@ Every change is logged in a `TailoringReport` with before/after diffs.
 
 ---
 
+## Recruiter Reply
+
+After matching and tailoring, the reply feature lets you compose and send
+personalised emails back to recruiters.
+
+### Features
+
+- **LLM-powered composition**: emails reference match insights and candidate strengths
+- **Questionnaire-driven topics**: salary, location, availability, interview questions
+- **Tailored resume attachments**: `.docx` files from the tailoring step are attached automatically
+- **Dry-run mode**: preview every email before sending (the default in `run-all`)
+- **Gmail threading**: replies appear in the original recruiter's conversation
+
+### Questionnaire config
+
+Create a JSON file to control what topics are included in your reply:
+
+```json
+{
+  "salary_range": "$180,000 - $220,000 USD",
+  "location_preference": "Remote or hybrid in SF Bay Area",
+  "availability": "Available in 2-3 weeks",
+  "interview_process_questions": [
+    "How many interview rounds?",
+    "Is there a take-home project?"
+  ],
+  "custom_questions": ["How is the engineering team structured?"],
+  "tone": "professional",
+  "max_length_words": 300
+}
+```
+
+See `examples/questionnaire.json` for the full schema.  Available tones:
+`professional`, `enthusiastic`, `casual`, `concise`.
+
+### Quick Start - Reply
+
+Using `run-all` (simplest):
+
+```bash
+email-pipeline run-all \
+  --resume examples/sample_resume.json \
+  --questionnaire examples/questionnaire.json \
+  --provider gmail --window 2d \
+  --work-dir data --out-dir output
+# Review output/replies/drafts_preview.md, then re-run with --send
+```
+
+Or step-by-step (after running match + tailor):
+
+```bash
+# Compose drafts
+email-pipeline compose \
+  --resume examples/sample_resume.json \
+  --match-results out/matches/match_results.json \
+  --opportunities data/opportunities.json \
+  --questionnaire examples/questionnaire.json \
+  --tailored-dir output/tailored \
+  --out output/replies \
+  --recommendation strong_apply,apply --top 5
+
+# Preview (dry-run)
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies --dry-run
+
+# Send
+email-pipeline reply \
+  --drafts output/replies/drafts.json \
+  --out output/replies
+```
+
+---
+
 ## Vendor: resume-builder
 
 The `vendor/resume-builder/` directory is a **git subtree** of the
@@ -390,6 +515,11 @@ uv sync   # or: pip install -e vendor/resume-builder
 - The `resume-builder` vendor package is needed for `.docx` generation in the
   `tailor` command. If not installed, tailoring still produces JSON/Markdown
   reports but skips `.docx` generation.
+- Sending emails requires Gmail OAuth credentials with the `gmail.send` scope.
+  The first time you use `reply` or `run-all --send`, you may be prompted to
+  re-authorise your Google account.
+- The `run-all` command defaults to **dry-run mode**.  Pass `--send` to
+  actually transmit emails.
 
 ## Troubleshooting
 

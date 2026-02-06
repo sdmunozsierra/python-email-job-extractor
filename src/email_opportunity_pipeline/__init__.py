@@ -9,11 +9,13 @@ This package provides a CLI (``email-pipeline``) and a Python API for:
 5. **Analyzing** job requirements with LLM
 6. **Matching** resumes against job opportunities
 7. **Tailoring** resumes per job using the vendor ``resume-builder`` package
+8. **Replying** to recruiters with tailored, LLM-composed emails
 
 Quick start (Python API)::
 
     from email_opportunity_pipeline.matching import Resume, ResumeMatcher
     from email_opportunity_pipeline.tailoring import TailoringEngine
+    from email_opportunity_pipeline.reply import ReplyComposer, GmailSender
 
 See ``docs/`` for full documentation.
 """
