@@ -8,7 +8,12 @@ At a high level, the pipeline is:
   Fetch ──> Filter ──> Extract ──> Render
                                      │
                               Analyze/Match ──> Tailor ──> Compose ──> Reply
+
+  [  run-all  ──────────────────────────────────────────────────────────── ]
 ```
+
+The `run-all` command orchestrates all stages in a single invocation with
+dry-run (default) or live send (`--send`) mode.
 
 1. **Fetch**: A provider pulls recent messages into a normalized `EmailMessage` model.
 2. **Filter**: A filter pipeline decides which messages look like job opportunities.

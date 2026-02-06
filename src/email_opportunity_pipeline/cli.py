@@ -595,6 +595,357 @@ def _print_tailoring_summary(tailored_resumes: list) -> None:
 
 
 # ============================================================================
+# Full End-to-End Pipeline Command
+# ============================================================================
+
+def _cmd_run_all(args: argparse.Namespace) -> None:
+    """Run the complete pipeline: fetch -> filter -> extract -> analyze ->
+    match -> tailor -> compose -> reply (dry-run by default).
+
+    This is the single-command equivalent of running every step manually.
+    It is designed for e2e testing and production use:
+
+    - ``--dry-run`` (the default): executes the entire pipeline but does
+      **not** send any emails.  Drafts and previews are written to disk
+      so you can inspect them before committing.
+    - ``--send``: same as above, but actually sends the composed emails
+      via Gmail at the end.
+
+    Every intermediate artifact is persisted under ``--work-dir`` so you
+    can re-run downstream stages without refetching.
+    """
+    import json as _json
+
+    from .matching import JobAnalyzer, ResumeMatcher
+    from .matching.report import render_match_summary
+    from .tailoring import TailoringEngine
+    from .tailoring.report import render_tailoring_report, render_tailoring_summary
+    from .reply import ReplyComposer, GmailSender, QuestionnaireConfig
+    from .reply.report import render_batch_preview, render_send_report
+
+    work_dir = Path(args.work_dir)
+    out_dir = Path(args.out_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    dry_run = not args.send
+    llm_model = args.llm_model
+
+    # ------------------------------------------------------------------
+    # Computed paths
+    # ------------------------------------------------------------------
+    messages_path = work_dir / "messages.json"
+    filtered_path = work_dir / "filtered.json"
+    opportunities_path = work_dir / "opportunities.json"
+    analyses_path = work_dir / "job_analyses.json"
+    matches_dir = out_dir / "matches"
+    match_results_path = matches_dir / "match_results.json"
+    tailored_dir = out_dir / "tailored"
+    replies_dir = out_dir / "replies"
+
+    mode_label = "DRY RUN" if dry_run else "LIVE"
+    print("=" * 64)
+    print(f"  EMAIL OPPORTUNITY PIPELINE -- FULL RUN ({mode_label})")
+    print("=" * 64)
+    print()
+
+    # ==================================================================
+    # STAGE 1: Fetch
+    # ==================================================================
+    if args.messages:
+        messages_list = list(read_messages(args.messages))
+        print(f"[1/8 fetch]   Loaded {len(messages_list)} messages from {args.messages}")
+        # Copy to work_dir for consistency
+        write_messages(messages_path, messages_list)
+    else:
+        provider = _build_provider(args.provider)
+        window = parse_window(args.window)
+        print(f"[1/8 fetch]   Fetching from {args.provider} (window={args.window})...")
+        messages_list = list(
+            provider.fetch_messages(
+                window=window,
+                max_results=args.max_results,
+                query=args.query,
+                include_body=True,
+            )
+        )
+        write_messages(messages_path, messages_list)
+        print(f"[1/8 fetch]   Fetched {len(messages_list)} messages -> {messages_path}")
+
+    if not messages_list:
+        print("\nNo messages found. Pipeline complete (nothing to process).")
+        return
+
+    # ==================================================================
+    # STAGE 2: Filter
+    # ==================================================================
+    print(f"[2/8 filter]  Filtering {len(messages_list)} messages...")
+    pipeline = build_filter_pipeline(
+        rules_path=args.rules or None,
+        use_llm=args.llm_filter,
+        llm_model=llm_model,
+    )
+
+    analytics = PipelineAnalytics()
+    analytics.start()
+    for msg in messages_list:
+        analytics.record_email_fetch(msg)
+
+    filter_results = filter_messages_with_outcomes(pipeline, messages_list)
+    filtered_messages = []
+    for email, outcome in filter_results:
+        analytics.record_filter_result(email, outcome)
+        if outcome.passed:
+            filtered_messages.append(email)
+
+    write_messages(filtered_path, filtered_messages)
+    print(f"[2/8 filter]  {len(filtered_messages)}/{len(messages_list)} passed -> {filtered_path}")
+
+    if not filtered_messages:
+        analytics.finish()
+        save_analytics(analytics, work_dir / "analytics.json")
+        save_report(analytics, work_dir / "analytics_report.txt")
+        print("\nNo messages passed filtering. Pipeline complete.")
+        return
+
+    # ==================================================================
+    # STAGE 3: Extract
+    # ==================================================================
+    print(f"[3/8 extract] Extracting opportunities...")
+    opportunities = extract_opportunities(
+        filtered_messages,
+        use_llm=args.llm_extract,
+        llm_model=llm_model,
+    )
+    for opp in opportunities:
+        analytics.record_extraction(opp)
+
+    write_opportunities(opportunities_path, opportunities)
+    analytics.finish()
+    save_analytics(analytics, work_dir / "analytics.json")
+    save_report(analytics, work_dir / "analytics_report.txt")
+
+    # Render markdown
+    markdown_dir = out_dir / "markdown"
+    render_markdown_files(opportunities, markdown_dir)
+    print(f"[3/8 extract] {len(opportunities)} opportunities -> {opportunities_path}")
+
+    if not opportunities:
+        print("\nNo opportunities extracted. Pipeline complete.")
+        return
+
+    # ==================================================================
+    # STAGE 4: Analyze (LLM)
+    # ==================================================================
+    print(f"[4/8 analyze] Analyzing {len(opportunities)} job(s) with LLM...")
+    analyzer = JobAnalyzer(model=llm_model)
+    analyses = []
+    for i, opp in enumerate(opportunities, 1):
+        title = opp.get("job_title", "Unknown")
+        company = opp.get("company", "Unknown")
+        print(f"              [{i}/{len(opportunities)}] {title} at {company}")
+        analysis = analyzer.analyze(opp)
+        analyses.append(analysis)
+
+    write_job_analyses(analyses_path, analyses)
+    print(f"[4/8 analyze] {len(analyses)} analyses -> {analyses_path}")
+
+    # ==================================================================
+    # STAGE 5: Match resume (LLM)
+    # ==================================================================
+    resume = read_resume(args.resume)
+    print(f"[5/8 match]   Matching resume ({resume.personal.name}) against {len(opportunities)} jobs...")
+
+    matcher = ResumeMatcher(model=llm_model)
+    match_results = matcher.match_batch(resume, opportunities, analyses)
+
+    matches_dir.mkdir(parents=True, exist_ok=True)
+    write_match_results(match_results_path, match_results, resume_id=resume.source_file)
+
+    summary_md = render_match_summary(match_results, opportunities)
+    (matches_dir / "match_summary.md").write_text(summary_md, encoding="utf-8")
+    print(f"[5/8 match]   {len(match_results)} match results -> {match_results_path}")
+
+    # Apply filters for downstream stages
+    selected = list(match_results)  # already sorted by score desc
+    if args.min_score:
+        selected = [r for r in selected if r.overall_score >= args.min_score]
+    if args.recommendation:
+        recs = set(args.recommendation.split(","))
+        selected = [r for r in selected if r.recommendation in recs]
+    if args.top:
+        selected = selected[: args.top]
+
+    if not selected:
+        print("\nNo match results survived filtering. Pipeline complete.")
+        _print_run_all_summary(messages_list, filtered_messages, opportunities,
+                               match_results, [], [], [], dry_run)
+        return
+
+    print(f"              Selected {len(selected)} job(s) for tailoring/reply "
+          f"(min_score={args.min_score}, rec={args.recommendation}, top={args.top})")
+
+    # Build jobs map for downstream
+    jobs_map: dict = {}
+    for opp in opportunities:
+        msg_id = opp.get("source_email", {}).get("message_id")
+        if msg_id:
+            jobs_map[msg_id] = opp
+
+    # ==================================================================
+    # STAGE 6: Tailor resumes
+    # ==================================================================
+    tailored_dir.mkdir(parents=True, exist_ok=True)
+    engine = TailoringEngine(output_dir=tailored_dir)
+    build_docx = not args.no_docx
+    tailored_resumes = []
+
+    print(f"[6/8 tailor]  Tailoring resume for {len(selected)} job(s)...")
+    for i, mr in enumerate(selected, 1):
+        job = jobs_map.get(mr.job_id, {})
+        job_title = job.get("job_title", "Unknown")
+        company = job.get("company", "Unknown")
+        print(f"              [{i}/{len(selected)}] {job_title} at {company}")
+        try:
+            tailored = engine.tailor(resume, mr, job, build_docx=build_docx)
+            tailored_resumes.append(tailored)
+
+            report_dir = tailored_dir / "tailoring_reports"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_tailoring_report(
+                report_dir / f"{mr.job_id}_report.json",
+                tailored.report.to_dict(),
+            )
+            md = render_tailoring_report(tailored.report)
+            (report_dir / f"{mr.job_id}_report.md").write_text(md, encoding="utf-8")
+            (report_dir / f"{mr.job_id}_resume.json").write_text(
+                _json.dumps(tailored.resume_data, indent=2), encoding="utf-8"
+            )
+        except Exception as e:
+            print(f"              Error tailoring: {e}")
+
+    if tailored_resumes:
+        batch = [tr.to_dict() for tr in tailored_resumes]
+        write_tailoring_results(tailored_dir / "tailoring_results.json", batch)
+        summary = render_tailoring_summary(tailored_resumes)
+        (tailored_dir / "tailoring_summary.md").write_text(summary, encoding="utf-8")
+
+    print(f"[6/8 tailor]  {len(tailored_resumes)} tailored resumes -> {tailored_dir}")
+
+    # ==================================================================
+    # STAGE 7: Compose reply emails
+    # ==================================================================
+    if args.questionnaire:
+        questionnaire = read_questionnaire(args.questionnaire)
+        print(f"[7/8 compose] Loaded questionnaire from {args.questionnaire}")
+    else:
+        questionnaire = QuestionnaireConfig()
+        print("[7/8 compose] Using default questionnaire configuration")
+
+    # Build attachment map from tailored .docx files
+    attachment_map: dict = {}
+    for mr in selected:
+        job = jobs_map.get(mr.job_id, {})
+        company = job.get("company", "Unknown")
+        title = job.get("job_title", "Unknown")
+        safe_company = "".join(c for c in company if c.isalnum() or c in " _-").strip()
+        safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
+        docx_name = f"tailored_resume_{safe_company}_{safe_title}.docx".replace(" ", "_")
+        docx_path = tailored_dir / docx_name
+        if docx_path.exists():
+            attachment_map[mr.job_id] = [str(docx_path)]
+
+    composer = ReplyComposer(model=llm_model)
+    print(f"[7/8 compose] Composing {len(selected)} reply email(s) "
+          f"(LLM: {'yes' if composer.llm_available else 'template fallback'})...")
+
+    jobs_list = [jobs_map.get(mr.job_id, {}) for mr in selected]
+    drafts = composer.compose_batch(
+        resume=resume,
+        match_results=selected,
+        jobs=jobs_list,
+        questionnaire=questionnaire,
+        attachment_map=attachment_map,
+    )
+
+    replies_dir.mkdir(parents=True, exist_ok=True)
+    write_drafts(replies_dir / "drafts.json", drafts)
+    preview_md = render_batch_preview(drafts)
+    (replies_dir / "drafts_preview.md").write_text(preview_md, encoding="utf-8")
+    print(f"[7/8 compose] {len(drafts)} drafts -> {replies_dir / 'drafts.json'}")
+
+    # ==================================================================
+    # STAGE 8: Reply (dry-run or send)
+    # ==================================================================
+    reply_label = "DRY RUN" if dry_run else "SENDING"
+    print(f"[8/8 reply]   {reply_label} {len(drafts)} email(s)...")
+
+    sender = GmailSender()
+    reply_results = sender.send_batch(drafts, dry_run=dry_run)
+
+    write_reply_results(replies_dir / "reply_results.json", reply_results)
+    report = render_send_report(reply_results)
+    (replies_dir / "reply_report.md").write_text(report, encoding="utf-8")
+    print(f"[8/8 reply]   Results -> {replies_dir / 'reply_results.json'}")
+
+    # ==================================================================
+    # Final summary
+    # ==================================================================
+    _print_run_all_summary(
+        messages_list, filtered_messages, opportunities,
+        match_results, selected, tailored_resumes, reply_results,
+        dry_run,
+    )
+
+
+def _print_run_all_summary(
+    messages, filtered, opportunities, all_matches,
+    selected_matches, tailored_resumes, reply_results,
+    dry_run,
+) -> None:
+    """Print a consolidated end-of-pipeline summary."""
+    from .reply.models import ReplyStatus
+
+    print()
+    print("=" * 64)
+    mode = "DRY RUN" if dry_run else "LIVE"
+    print(f"  PIPELINE COMPLETE ({mode})")
+    print("=" * 64)
+    print()
+
+    print(f"  Fetched messages:     {len(messages)}")
+    print(f"  Passed filter:        {len(filtered)}")
+    print(f"  Opportunities:        {len(opportunities)}")
+    print(f"  Total matches:        {len(all_matches)}")
+    print(f"  Selected for reply:   {len(selected_matches)}")
+    print(f"  Tailored resumes:     {len(tailored_resumes)}")
+
+    if reply_results:
+        sent = sum(1 for r in reply_results if r.status == ReplyStatus.SENT)
+        previewed = sum(1 for r in reply_results if r.status == ReplyStatus.DRY_RUN)
+        failed = sum(1 for r in reply_results if r.status == ReplyStatus.FAILED)
+        print(f"  Emails sent:          {sent}")
+        print(f"  Emails previewed:     {previewed}")
+        print(f"  Emails failed:        {failed}")
+
+    # Top matches
+    if all_matches:
+        print()
+        print("  Top matches:")
+        for i, r in enumerate(all_matches[:5], 1):
+            print(f"    {i}. [{r.overall_score:.0f}] {r.match_grade} / {r.recommendation} "
+                  f"(job_id={r.job_id[:20]}...)")
+
+    print()
+    if dry_run:
+        print("  This was a DRY RUN.  No emails were sent.")
+        print("  Review drafts in the replies/ directory, then re-run with --send.")
+    else:
+        print("  Emails have been sent.  Check reply_report.md for details.")
+    print()
+
+
+# ============================================================================
 # Recruiter Reply Commands
 # ============================================================================
 
@@ -873,6 +1224,99 @@ def main() -> None:
     run.add_argument("--no-analytics", action="store_true", help="Disable analytics generation")
     run.add_argument("--show-report", action="store_true", help="Print analytics report to console")
     run.set_defaults(func=_cmd_run)
+
+    # =========================================================================
+    # Full End-to-End Pipeline Command
+    # =========================================================================
+
+    run_all = subparsers.add_parser(
+        "run-all",
+        help="Full e2e pipeline: fetch -> filter -> extract -> analyze -> "
+             "match -> tailor -> compose -> reply (dry-run by default)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Run the complete pipeline from email fetch through recruiter reply.\n"
+            "\n"
+            "By default this executes in DRY-RUN mode: the entire pipeline runs\n"
+            "but no emails are actually sent.  Drafts and previews are written\n"
+            "to disk so you can inspect them.  Pass --send to transmit for real.\n"
+            "\n"
+            "Quickstart (dry-run):\n"
+            "  email-pipeline run-all \\\n"
+            "    --resume examples/sample_resume.json \\\n"
+            "    --questionnaire examples/questionnaire.json \\\n"
+            "    --provider gmail --window 2d \\\n"
+            "    --work-dir data --out-dir output\n"
+            "\n"
+            "Quickstart (send for real):\n"
+            "  email-pipeline run-all \\\n"
+            "    --resume examples/sample_resume.json \\\n"
+            "    --questionnaire examples/questionnaire.json \\\n"
+            "    --provider gmail --window 2d \\\n"
+            "    --work-dir data --out-dir output --send\n"
+        ),
+    )
+
+    # -- Input sources --
+    run_all_input = run_all.add_argument_group("input sources")
+    run_all_input.add_argument(
+        "--resume", required=True,
+        help="Path to the candidate resume file (JSON or Markdown)"
+    )
+    run_all_input.add_argument(
+        "--questionnaire",
+        help="Path to questionnaire config JSON (salary, location, questions); "
+             "see examples/questionnaire.json"
+    )
+    run_all_input.add_argument(
+        "--messages",
+        help="Skip fetching and use an existing messages JSON file instead"
+    )
+
+    # -- Fetch options --
+    run_all_fetch = run_all.add_argument_group("fetch options (ignored when --messages is set)")
+    run_all_fetch.add_argument("--provider", default="gmail", choices=["gmail"])
+    run_all_fetch.add_argument("--window", default=DEFAULT_WINDOW,
+                               help="Time window like 30m, 6h, 2d (default: %(default)s)")
+    run_all_fetch.add_argument("--query", default="", help="Provider-specific query string")
+    run_all_fetch.add_argument("--max-results", type=int, default=None,
+                               help="Cap the number of fetched messages")
+
+    # -- Filter / extract options --
+    run_all_filter = run_all.add_argument_group("filter and extraction")
+    run_all_filter.add_argument("--rules", default="",
+                                help="Path to filter rules JSON")
+    run_all_filter.add_argument("--llm-filter", action="store_true",
+                                help="Enable LLM filter stage")
+    run_all_filter.add_argument("--llm-extract", action="store_true",
+                                help="Enable LLM extraction")
+
+    # -- Match / tailor / reply filtering --
+    run_all_select = run_all.add_argument_group("match selection (which jobs to tailor + reply to)")
+    run_all_select.add_argument("--min-score", type=float,
+                                help="Only tailor/reply for jobs with at least this match score")
+    run_all_select.add_argument("--recommendation",
+                                help="Comma-separated recommendations (e.g. strong_apply,apply)")
+    run_all_select.add_argument("--top", type=int,
+                                help="Limit to top N matches by score")
+
+    # -- Output --
+    run_all_output = run_all.add_argument_group("output directories")
+    run_all_output.add_argument("--work-dir", default="data",
+                                help="Where JSON artifacts are written (default: %(default)s)")
+    run_all_output.add_argument("--out-dir", default="output",
+                                help="Where reports, tailored resumes, and replies go (default: %(default)s)")
+
+    # -- Behaviour --
+    run_all_behaviour = run_all.add_argument_group("behaviour")
+    run_all_behaviour.add_argument("--send", action="store_true",
+                                   help="Actually send reply emails (default is dry-run)")
+    run_all_behaviour.add_argument("--no-docx", action="store_true",
+                                   help="Skip .docx generation")
+    run_all_behaviour.add_argument("--llm-model", default="gpt-4o-mini",
+                                   help="LLM model for all LLM stages (default: %(default)s)")
+
+    run_all.set_defaults(func=_cmd_run_all)
 
     # Analytics command (standalone)
     analytics = subparsers.add_parser("analytics", help="Generate analytics from existing data")
