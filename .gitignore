@@ -2,6 +2,10 @@
 __pycache__/
 *.py[codz]
 *$py.class
+.python-version
+
+# UV
+uv.lock
 
 # C extensions
 *.so
