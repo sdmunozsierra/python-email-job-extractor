@@ -2,15 +2,16 @@
 
 Fetch, filter, and normalize email job opportunities into a JSON schema, then
 render Markdown with YAML frontmatter for downstream automation. **Now with
-Job Analysis and Resume Matching** to rank opportunities and get actionable
-insights.
+Job Analysis, Resume Matching, and Resume Tailoring** to rank opportunities,
+get actionable insights, and generate tailored `.docx` resumes.
 
 ## Documentation
 
 - `docs/cli.md`: CLI commands and examples
 - `docs/configuration.md`: environment variables, file formats, rules, and windows
-- `docs/architecture.md`: pipeline stages and extension points (providers/filters/extractors)
+- `docs/architecture.md`: pipeline stages, interfaces, vendor integration, and extension points
 - `docs/troubleshooting.md`: common setup/runtime issues
+- `CONTRIBUTING.md`: development setup and contribution guidelines
 
 ## Why this exists
 
@@ -26,73 +27,110 @@ insights.
   postings including skills, experience levels, and technical environment.
 - **Resume Matching**: Score and rank job opportunities against your resume
   with detailed insights, gap analysis, and tailoring suggestions.
+- **Resume Tailoring**: Automatically generate tailored `.docx` resumes per
+  job, emphasizing relevant skills, reordering experience, and tracking every
+  change in a detailed report.
 
 ## Project layout
 
 ```
 src/email_opportunity_pipeline/
-  cli.py
-  config.py
-  models.py
-  io.py
-  pipeline.py
+  __init__.py              # Package root with version
+  cli.py                   # email-pipeline CLI entry point
+  config.py                # Default settings (window, Gmail scopes)
+  models.py                # EmailMessage, FilterDecision, FilterOutcome
+  io.py                    # Read/write JSON artifacts
+  pipeline.py              # Orchestration (fetch -> filter -> extract -> render)
+  time_window.py           # Time window parsing (30m, 6h, 2d)
+  analytics.py             # Pipeline analytics and reporting
   providers/
-    base.py
-    gmail.py
-    gmail_parser.py
+    base.py                # EmailProvider abstract interface
+    gmail.py               # Gmail API provider implementation
+    gmail_parser.py         # Gmail message parsing
   filters/
-    base.py
-    keyword.py
-    llm.py
-    rules.py
+    base.py                # EmailFilter abstract interface
+    keyword.py             # Rule-based keyword/domain filter
+    llm.py                 # Optional LLM-based filter
+    pipeline.py            # FilterPipeline orchestrator
+    rules.py               # FilterRules model and loader
   extraction/
-    schema.py
-    extractor.py
-    markdown.py
-    rules_extractor.py
-    llm_extractor.py
-  matching/                    # NEW: Job Analysis & Resume Matching
+    extractor.py           # BaseExtractor abstract interface
+    schema.py              # Job opportunity JSON schema
+    rules_extractor.py     # Deterministic regex/heuristic extractor
+    llm_extractor.py       # OpenAI schema-driven extractor
+    markdown.py            # Markdown + YAML frontmatter renderer
+  matching/                # Job Analysis & Resume Matching (LLM)
     __init__.py
-    models.py                  # Resume, MatchResult, SkillMatch, etc.
-    resume_parser.py           # Parse JSON/Markdown resumes
-    analyzer.py                # LLM job requirement extraction
-    matcher.py                 # LLM resume-job matching
-    report.py                  # Markdown report generation
+    models.py              # Resume, MatchResult, SkillMatch, etc.
+    resume_parser.py       # Parse JSON/Markdown resumes
+    analyzer.py            # LLM job requirement extraction
+    matcher.py             # LLM resume-job matching
+    report.py              # Markdown report generation
+  tailoring/               # Resume Tailoring (uses vendor/resume-builder)
+    __init__.py
+    adapter.py             # Pipeline Resume <-> builder schema adapter
+    engine.py              # Tailoring engine (apply match insights)
+    models.py              # TailoredResume, TailoringReport, TailoringChange
+    report.py              # Markdown tailoring report renderer
   schemas/
     job_opportunity.schema.json
-    resume.schema.json         # NEW
-    match_result.schema.json   # NEW
+    resume.schema.json
+    match_result.schema.json
+vendor/
+  resume-builder/          # Git subtree: .docx generation from JSON schema
+    src/resume_builder/
+      cli.py               # resume-builder CLI
+      schema_adapter.py    # JSON schema -> Person model adapter
+      person_builder.py    # Person builder pattern
+      ...
 examples/
   filter_rules.json
-  sample_resume.json           # NEW
+  sample_resume.json
+docs/
+  architecture.md
+  cli.md
+  configuration.md
+  troubleshooting.md
 ```
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.11+
 - Gmail provider: Google OAuth desktop credentials + Gmail API enabled
 - LLM features: optional OpenAI dependency + `OPENAI_API_KEY`
 
-## Install (uv)
+## Install
 
-```
+### Using uv (recommended)
+
+```bash
 uv venv
 source .venv/bin/activate
-uv pip install -e .
+uv sync
 ```
 
-Install (pip):
+`uv sync` automatically installs the vendor `resume-builder` package as an
+editable path dependency via `[tool.uv.sources]`.
 
-```
+### Using pip
+
+With pip, install the vendor dependency first, then the main package:
+
+```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
+pip install -e vendor/resume-builder
+pip install -e .
 ```
 
-Optional LLM support (OpenAI):
+### Optional LLM support (OpenAI)
 
-```
+```bash
+# uv
 uv pip install -e ".[llm]"
+
+# pip
+pip install -e ".[llm]"
 ```
 
 ## LLM setup (optional)
@@ -100,7 +138,7 @@ uv pip install -e ".[llm]"
 LLM features (LLM filter, LLM extraction, job analysis, resume matching) use the
 OpenAI Python SDK. Set an API key via environment variable:
 
-```
+```bash
 export OPENAI_API_KEY="..."
 ```
 
@@ -122,13 +160,13 @@ Environment variables:
 
 Fetch the last 24 hours:
 
-```
+```bash
 email-pipeline fetch --provider gmail --window 1d --out data/messages.json
 ```
 
 Run the full pipeline:
 
-```
+```bash
 email-pipeline run \
   --provider gmail \
   --window 6h \
@@ -138,7 +176,7 @@ email-pipeline run \
 
 Step-by-step:
 
-```
+```bash
 email-pipeline fetch --provider gmail --window 6h --out data/messages.json
 email-pipeline filter --in data/messages.json --out data/filtered.json
 email-pipeline extract --in data/filtered.json --out data/opportunities.json
@@ -150,7 +188,7 @@ email-pipeline render --in data/opportunities.json --out out
 Start from `examples/filter_rules.json` to customize allow/deny domains,
 keywords, and patterns.
 
-```
+```bash
 email-pipeline filter --in data/messages.json --out data/filtered.json \
   --rules examples/filter_rules.json
 ```
@@ -268,12 +306,90 @@ The match command generates:
 
 ---
 
+## Resume Tailoring
+
+The tailoring command builds on match results to produce tailored resumes with
+tracked changes. It uses the **vendor/resume-builder** subtree package to
+generate `.docx` Word documents.
+
+### Quick Start - Tailoring
+
+```bash
+# Tailor resume for top matches
+email-pipeline tailor \
+  --resume examples/sample_resume.json \
+  --match-results out/matches/match_results.json \
+  --opportunities data/opportunities.json \
+  --out output/tailored \
+  --min-score 70 \
+  --recommendation strong_apply,apply \
+  --top 5
+```
+
+### Tailoring Output
+
+Per job:
+- `<job_id>_resume.json` -- tailored resume data
+- `<job_id>_report.json` -- structured change report
+- `<job_id>_report.md` -- human-readable Markdown report
+- `tailored_resume_<company>_<title>.docx` -- the generated Word document
+
+Batch:
+- `tailoring_results.json` -- all results in one file
+- `tailoring_summary.md` -- summary across all tailored resumes
+
+### What the tailoring engine does
+
+| Category | Action |
+|----------|--------|
+| Summary | Replaces with a job-tailored summary from match analysis |
+| Skills | Reorders technical skills, prioritizing mandatory/highlighted ones |
+| Experience | Reorders entries by relevance, surfaces featured achievements |
+| Certifications | Reorders by relevance to target role |
+| Keywords | Identifies ATS keywords for reference |
+
+Every change is logged in a `TailoringReport` with before/after diffs.
+
+---
+
+## Vendor: resume-builder
+
+The `vendor/resume-builder/` directory is a **git subtree** of the
+[python-resume-builder](https://github.com/sdmunozsierra/python-resume-builder)
+repository. It provides:
+
+- `ResumeSchemaAdapter` -- converts a JSON resume dict into internal Person models
+- `build_resume(person)` -- generates a `.docx` Word document from a Person object
+- A standalone CLI: `resume-builder --json resume.json --output my_resume.docx`
+
+The parent project declares it as an editable path dependency:
+
+```toml
+# pyproject.toml
+[tool.uv.sources]
+resume-builder = { path = "vendor/resume-builder", editable = true }
+```
+
+To update the subtree from upstream:
+
+```bash
+git fetch resume-builder
+git subtree pull --prefix=vendor/resume-builder resume-builder main --squash
+uv sync   # or: pip install -e vendor/resume-builder
+```
+
+---
+
 ## Notes
 
 - Gmail attachments are listed but not downloaded.
 - The LLM filter and LLM extractor are **optional**. You can keep everything
   rule-based for predictable behavior.
-- Job Analysis and Resume Matching **require** the LLM optional dependency.
+- Job Analysis, Resume Matching, and Resume Tailoring **require** the LLM
+  optional dependency (`pip install -e ".[llm]"`).
+- The `resume-builder` vendor package is needed for `.docx` generation in the
+  `tailor` command. If not installed, tailoring still produces JSON/Markdown
+  reports but skips `.docx` generation.
 
 ## Troubleshooting
 
