@@ -185,6 +185,8 @@ Environment variables:
 The `run-all` command executes every stage -- from email fetch through
 recruiter reply -- in a single invocation.  **It runs in dry-run mode by
 default**, so no emails are sent until you explicitly opt in.
+Add `--interactive` to step through each stage, skip parts of the pipeline,
+and manually select emails/opportunities/matches/drafts before proceeding.
 
 ```bash
 # 1. Set up credentials
@@ -201,7 +203,8 @@ email-pipeline run-all \
   --questionnaire my_questionnaire.json \
   --provider gmail --window 2d \
   --min-score 70 --recommendation strong_apply,apply --top 5 \
-  --work-dir data --out-dir output
+  --work-dir data --out-dir output \
+  --interactive
 
 # 4. Review the drafts
 #    Open output/replies/drafts_preview.md to inspect every email.
