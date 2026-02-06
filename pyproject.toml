@@ -30,4 +30,4 @@ where = ["src"]
 "email_opportunity_pipeline.schemas" = ["*.json"]
 
 [tool.uv.sources]
-resume-builder = { path = "resume_builder", editable = true }
+resume-builder = { path = "vendor/resume-builder", editable = true }

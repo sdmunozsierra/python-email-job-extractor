@@ -465,7 +465,7 @@ class TailoringEngine:
         except ImportError:
             logger.warning(
                 "resume-builder package not installed; skipping .docx generation. "
-                "Run 'uv sync' or 'pip install -e resume_builder' to enable."
+                "Run 'uv sync' or 'pip install -e vendor/resume-builder' to enable."
             )
             return None
 
