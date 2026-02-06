@@ -19,11 +19,11 @@ At a high level, the pipeline is:
 - `src/email_opportunity_pipeline/schemas/`: JSON schemas shipped with the package
 - `src/email_opportunity_pipeline/pipeline.py`: orchestration functions used by the CLI
 - `src/email_opportunity_pipeline/cli.py`: `email-pipeline` command definitions
-- `resume_builder/`: **git subtree** -- the `resume-builder` package for .docx generation
+- `vendor/resume-builder/`: **git subtree** -- the `resume-builder` package for .docx generation
 
 ### Resume builder subtree
 
-The `resume_builder/` directory is a git subtree of the
+The `vendor/resume-builder/` directory is a git subtree of the
 [python-resume-builder](https://github.com/sdmunozsierra/python-resume-builder)
 repository. It provides:
 
@@ -38,7 +38,7 @@ To update the subtree from upstream:
 
 ```bash
 git fetch resume-builder
-git subtree pull --prefix=resume_builder resume-builder main --squash
+git subtree pull --prefix=vendor/resume-builder resume-builder main --squash
 uv sync
 ```
 
