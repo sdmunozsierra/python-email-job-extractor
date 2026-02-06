@@ -23,6 +23,10 @@ from .io import (
     read_job_analyses,
     write_tailoring_report,
     write_tailoring_results,
+    read_questionnaire,
+    write_drafts,
+    read_drafts,
+    write_reply_results,
 )
 from .pipeline import (
     build_filter_pipeline,
@@ -590,6 +594,232 @@ def _print_tailoring_summary(tailored_resumes: list) -> None:
     print(f"Generated .docx files: {docx_count}/{len(tailored_resumes)}")
 
 
+# ============================================================================
+# Recruiter Reply Commands
+# ============================================================================
+
+def _cmd_compose(args: argparse.Namespace) -> None:
+    """Compose tailored recruiter reply emails using LLM."""
+    from .reply import ReplyComposer, QuestionnaireConfig
+    from .reply.report import render_batch_preview, render_draft_preview
+
+    # Load inputs
+    resume = read_resume(args.resume)
+    print(f"Loaded resume for: {resume.personal.name}")
+
+    match_results = read_match_results(args.match_results)
+    print(f"Loaded {len(match_results)} match results")
+
+    # Load opportunities for job context
+    opportunities = []
+    jobs_map: dict = {}
+    if args.opportunities:
+        opportunities = read_opportunities(args.opportunities)
+        for opp in opportunities:
+            msg_id = opp.get("source_email", {}).get("message_id")
+            if msg_id:
+                jobs_map[msg_id] = opp
+        print(f"Loaded {len(opportunities)} opportunities for context")
+
+    # Load questionnaire
+    if args.questionnaire:
+        questionnaire = read_questionnaire(args.questionnaire)
+        print(f"Loaded questionnaire from {args.questionnaire}")
+    else:
+        questionnaire = QuestionnaireConfig()
+        print("Using default questionnaire configuration")
+
+    # Filter match results
+    if args.min_score:
+        match_results = [r for r in match_results if r.overall_score >= args.min_score]
+        print(f"After min-score filter: {len(match_results)} results")
+
+    if args.recommendation:
+        recs = set(args.recommendation.split(","))
+        match_results = [r for r in match_results if r.recommendation in recs]
+        print(f"After recommendation filter: {len(match_results)} results")
+
+    if args.top:
+        match_results.sort(key=lambda r: r.overall_score, reverse=True)
+        match_results = match_results[:args.top]
+
+    if not match_results:
+        print("No match results to compose replies for.")
+        return
+
+    # Build attachment map from tailoring output
+    attachment_map: dict = {}
+    if args.tailored_dir:
+        tailored_dir = Path(args.tailored_dir)
+        if tailored_dir.exists():
+            for mr in match_results:
+                job = jobs_map.get(mr.job_id, {})
+                company = job.get("company", "Unknown")
+                title = job.get("job_title", "Unknown")
+                safe_company = "".join(
+                    c for c in company if c.isalnum() or c in " _-"
+                ).strip()
+                safe_title = "".join(
+                    c for c in title if c.isalnum() or c in " _-"
+                ).strip()
+                docx_name = (
+                    f"tailored_resume_{safe_company}_{safe_title}.docx".replace(
+                        " ", "_"
+                    )
+                )
+                docx_path = tailored_dir / docx_name
+                if docx_path.exists():
+                    attachment_map[mr.job_id] = [str(docx_path)]
+            print(f"Found {len(attachment_map)} tailored resume attachments")
+
+    # Compose
+    composer = ReplyComposer(model=args.llm_model)
+    print(f"\nComposing {len(match_results)} reply emails "
+          f"(LLM: {'yes' if composer.llm_available else 'no, using templates'})...")
+
+    jobs_list = [jobs_map.get(mr.job_id, {}) for mr in match_results]
+    drafts = composer.compose_batch(
+        resume=resume,
+        match_results=match_results,
+        jobs=jobs_list,
+        questionnaire=questionnaire,
+        attachment_map=attachment_map,
+    )
+
+    print(f"Composed {len(drafts)} drafts")
+
+    # Output
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save drafts JSON
+    drafts_path = out_dir / "drafts.json"
+    write_drafts(drafts_path, drafts)
+    print(f"\nDrafts saved to {drafts_path}")
+
+    # Save preview report
+    preview_path = out_dir / "drafts_preview.md"
+    preview_md = render_batch_preview(drafts)
+    preview_path.write_text(preview_md, encoding="utf-8")
+    print(f"Preview report saved to {preview_path}")
+
+    # Save individual previews
+    previews_dir = out_dir / "previews"
+    previews_dir.mkdir(parents=True, exist_ok=True)
+    for draft in drafts:
+        md = render_draft_preview(draft)
+        safe_id = draft.job_id.replace("/", "_").replace("\\", "_")[:60]
+        preview_file = previews_dir / f"{safe_id}_preview.md"
+        preview_file.write_text(md, encoding="utf-8")
+    print(f"Individual previews saved to {previews_dir}")
+
+    # Console summary
+    _print_compose_summary(drafts)
+
+
+def _print_compose_summary(drafts: list) -> None:
+    """Print a compose summary to console."""
+    print("\n" + "=" * 60)
+    print(f"COMPOSE SUMMARY - {len(drafts)} Drafts Generated")
+    print("=" * 60)
+
+    for i, d in enumerate(drafts, 1):
+        score = f"{d.match_score:.0f}" if d.match_score is not None else "N/A"
+        att = f" (+{len(d.attachment_paths)} attachment(s))" if d.attachment_paths else ""
+        print(f"\n{i}. {d.job_title} at {d.company}")
+        print(f"   To: {d.to}")
+        print(f"   Subject: {d.subject}")
+        print(f"   Match: {score}/100{att}")
+
+    with_attachments = sum(1 for d in drafts if d.attachment_paths)
+    print(f"\nDrafts with attachments: {with_attachments}/{len(drafts)}")
+    print("\nReview drafts, then run 'reply' to send (or use --dry-run).")
+
+
+def _cmd_reply(args: argparse.Namespace) -> None:
+    """Send (or dry-run) composed recruiter reply emails."""
+    from .reply import GmailSender
+    from .reply.report import render_send_report
+
+    # Load drafts
+    drafts = read_drafts(args.drafts)
+    print(f"Loaded {len(drafts)} email drafts from {args.drafts}")
+
+    if not drafts:
+        print("No drafts to send.")
+        return
+
+    # Filter by index if requested
+    if args.index is not None:
+        if args.index < 0 or args.index >= len(drafts):
+            print(f"Error: index {args.index} out of range (0-{len(drafts)-1})")
+            return
+        drafts = [drafts[args.index]]
+        print(f"Selected draft {args.index}: {drafts[0].job_title} at {drafts[0].company}")
+
+    dry_run = args.dry_run
+    mode_label = "DRY RUN" if dry_run else "SENDING"
+    print(f"\n--- {mode_label}: {len(drafts)} email(s) ---\n")
+
+    # Send / dry-run
+    sender = GmailSender()
+    results = sender.send_batch(drafts, dry_run=dry_run)
+
+    # Output
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save results JSON
+    results_path = out_dir / "reply_results.json"
+    write_reply_results(results_path, results)
+    print(f"\nResults saved to {results_path}")
+
+    # Save report
+    report_md = render_send_report(results)
+    report_path = out_dir / "reply_report.md"
+    report_path.write_text(report_md, encoding="utf-8")
+    print(f"Report saved to {report_path}")
+
+    # Console summary
+    _print_reply_summary(results, dry_run)
+
+
+def _print_reply_summary(results: list, dry_run: bool) -> None:
+    """Print a reply summary to console."""
+    from .reply.models import ReplyStatus
+
+    print("\n" + "=" * 60)
+    mode = "DRY RUN" if dry_run else "SEND"
+    print(f"REPLY {mode} SUMMARY - {len(results)} email(s)")
+    print("=" * 60)
+
+    for i, r in enumerate(results, 1):
+        d = r.draft
+        status_icon = {
+            ReplyStatus.SENT: "[SENT]",
+            ReplyStatus.DRY_RUN: "[PREVIEW]",
+            ReplyStatus.FAILED: "[FAILED]",
+            ReplyStatus.DRAFT: "[DRAFT]",
+        }.get(r.status, "[?]")
+
+        print(f"\n{i}. {status_icon} {d.job_title} at {d.company}")
+        print(f"   To: {d.to}")
+        if r.gmail_message_id:
+            print(f"   Gmail ID: {r.gmail_message_id}")
+        if r.error:
+            print(f"   Error: {r.error}")
+
+    sent = sum(1 for r in results if r.status == ReplyStatus.SENT)
+    failed = sum(1 for r in results if r.status == ReplyStatus.FAILED)
+    previewed = sum(1 for r in results if r.status == ReplyStatus.DRY_RUN)
+
+    print(f"\nSent: {sent} | Previewed: {previewed} | Failed: {failed}")
+
+    if dry_run:
+        print("\nThis was a dry run. No emails were sent.")
+        print("Remove --dry-run to actually send the emails.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Email opportunity pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -787,6 +1017,80 @@ def main() -> None:
         help="Skip .docx generation (produce JSON/Markdown reports only)"
     )
     tailor.set_defaults(func=_cmd_tailor)
+
+    # =========================================================================
+    # Recruiter Reply Commands
+    # =========================================================================
+
+    # Compose command -- generate reply drafts
+    compose = subparsers.add_parser(
+        "compose",
+        help="Compose tailored reply emails to recruiters (LLM-powered)"
+    )
+    compose.add_argument(
+        "--resume", required=True,
+        help="Path to the candidate resume file (JSON or Markdown)"
+    )
+    compose.add_argument(
+        "--match-results", required=True,
+        help="Path to match results JSON file (from 'match' command)"
+    )
+    compose.add_argument(
+        "--opportunities",
+        help="Path to opportunities JSON file (for recruiter contact info)"
+    )
+    compose.add_argument(
+        "--questionnaire",
+        help="Path to questionnaire config JSON (salary, location, questions, etc.)"
+    )
+    compose.add_argument(
+        "--tailored-dir",
+        help="Directory containing tailored .docx resumes to attach"
+    )
+    compose.add_argument(
+        "--out", required=True,
+        help="Output directory for composed drafts and previews"
+    )
+    compose.add_argument(
+        "--min-score", type=float,
+        help="Only compose replies for jobs with at least this match score"
+    )
+    compose.add_argument(
+        "--recommendation",
+        help="Comma-separated recommendations to compose for (e.g. strong_apply,apply)"
+    )
+    compose.add_argument(
+        "--top", type=int,
+        help="Limit to top N match results by score"
+    )
+    compose.add_argument(
+        "--llm-model", default="gpt-4o-mini",
+        help="LLM model to use for email composition"
+    )
+    compose.set_defaults(func=_cmd_compose)
+
+    # Reply command -- send composed drafts
+    reply = subparsers.add_parser(
+        "reply",
+        help="Send (or dry-run) composed recruiter reply emails"
+    )
+    reply.add_argument(
+        "--drafts", required=True,
+        help="Path to drafts JSON file (from 'compose' command)"
+    )
+    reply.add_argument(
+        "--out", required=True,
+        help="Output directory for send results and report"
+    )
+    reply.add_argument(
+        "--dry-run", action="store_true",
+        help="Preview emails without sending (validate MIME, report only)"
+    )
+    reply.add_argument(
+        "--index", type=int,
+        help="Send only the draft at this index (0-based)"
+    )
+    reply.set_defaults(func=_cmd_reply)
 
     args = parser.parse_args()
     args.func(args)

@@ -1,0 +1,25 @@
+{
+  "salary_range": "$180,000 - $220,000 USD",
+  "salary_notes": "Open to negotiation depending on total compensation package including equity and benefits.",
+  "location_preference": "Prefer remote or hybrid in San Francisco Bay Area.",
+  "relocation_notes": "Not open to relocation at this time.",
+  "availability": "Available to start within 2-3 weeks.",
+  "notice_period": "2 weeks notice required at current position.",
+  "visa_status": null,
+  "interview_process_questions": [
+    "What does the interview process look like and how many rounds should I expect?",
+    "Is there a technical assessment or take-home project?",
+    "What is the expected timeline from first interview to offer?"
+  ],
+  "custom_questions": [
+    "What does a typical day look like for someone in this role?",
+    "How is the engineering team structured?"
+  ],
+  "include_salary": true,
+  "include_location": true,
+  "include_interview_questions": true,
+  "include_availability": true,
+  "tone": "professional",
+  "max_length_words": 300,
+  "extra_instructions": null
+}
