@@ -3,11 +3,12 @@ name = "email-opportunity-pipeline"
 version = "0.1.0"
 description = "Fetch, filter, and normalize email job opportunities."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "google-api-python-client>=2.0.0",
   "google-auth-httplib2>=0.2.0",
   "google-auth-oauthlib>=1.0.0",
+  "resume-builder",
 ]
 
 [project.optional-dependencies]
@@ -19,7 +20,7 @@ llm = [
 email-pipeline = "email_opportunity_pipeline.cli:main"
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -27,3 +28,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "email_opportunity_pipeline.schemas" = ["*.json"]
+
+[tool.uv.sources]
+resume-builder = { path = "resume_builder", editable = true }

@@ -63,7 +63,28 @@ Most commands write a wrapper object containing timestamps and counts. For examp
 - `opportunities.json` contains `{ created_at_utc, count, opportunities: [...] }`
 - `match_results.json` contains `{ created_at_utc, resume_id, count, match_results: [...] }`
 - `job_analyses.json` contains `{ created_at_utc, count, analyses: [...] }`
+- `tailoring_results.json` contains `{ created_at_utc, count, tailoring_results: [...] }`
 
 Markdown output is written as one file per opportunity using the source email
 message id, e.g. `out/<message_id>.md`.
+
+### Resume builder (subtree)
+
+The `resume_builder/` directory is a git subtree of the python-resume-builder
+package. It is declared as an editable path dependency in `pyproject.toml`:
+
+```toml
+[tool.uv.sources]
+resume-builder = { path = "resume_builder", editable = true }
+```
+
+After `uv sync`, the `resume-builder` console script and the `resume_builder`
+Python package are both available. The `tailor` command uses this package to
+generate `.docx` files from tailored resume data.
+
+If you are not using `uv`, you can install the subtree manually:
+
+```bash
+pip install -e resume_builder
+```
 

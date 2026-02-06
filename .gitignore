@@ -149,6 +149,8 @@ credentials.json
 token.json
 data/
 out/
+output/
+*.docx
 
 # Spyder project settings
 .spyderproject
