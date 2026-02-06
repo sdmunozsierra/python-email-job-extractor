@@ -1,6 +1,11 @@
-## CLI reference
+# CLI Reference
 
-The package installs a CLI named `email-pipeline` (see `pyproject.toml`).
+The package installs two CLI entry points:
+
+- `email-pipeline` -- the main pipeline CLI (installed from the root package)
+- `resume-builder` -- the vendor resume builder CLI (installed from `vendor/resume-builder/`)
+
+## email-pipeline
 
 ### Global usage
 
@@ -9,9 +14,28 @@ email-pipeline --help
 email-pipeline <command> --help
 ```
 
-### Commands
+### Available commands
 
-#### `fetch`
+| Command | Description | LLM required |
+|---------|-------------|:------------:|
+| `fetch` | Fetch emails from a provider | No |
+| `filter` | Filter emails by keyword rules | Optional |
+| `extract` | Extract opportunities to schema JSON | Optional |
+| `render` | Render Markdown from opportunities JSON | No |
+| `run` | Full pipeline (fetch + filter + extract + render) | Optional |
+| `analytics` | Generate analytics from existing data | No |
+| `analyze` | Extract structured requirements from jobs | Yes |
+| `match` | Match a resume against job opportunities | Yes |
+| `rank` | Filter and rank match results | No |
+| `tailor` | Tailor a resume for jobs using match results | No* |
+
+\* The `tailor` command does not call the LLM itself but requires match results
+produced by the `match` command (which does). The `resume-builder` vendor
+package is needed for `.docx` generation.
+
+---
+
+### `fetch`
 
 Fetch emails from a provider into a messages JSON artifact.
 
@@ -19,16 +43,18 @@ Fetch emails from a provider into a messages JSON artifact.
 email-pipeline fetch --provider gmail --window 1d --out data/messages.json
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--provider` | choice | `gmail` | Provider name (currently `gmail`) |
+| `--window` | string | `1d` | Time window: `30m`, `6h`, `2d` |
+| `--query` | string | `""` | Provider-specific query (Gmail search syntax) |
+| `--max-results` | int | unlimited | Cap the number of results |
+| `--metadata-only` | flag | off | Fetch metadata only (no body/attachments) |
+| `--out` | path | **required** | Output JSON path |
 
-- `--provider`: provider name (currently `gmail`)
-- `--window`: time window like `30m`, `6h`, `2d`
-- `--query`: provider-specific query string (Gmail search query). If omitted, uses the window.
-- `--max-results`: cap results
-- `--metadata-only`: fetch Gmail metadata only (no body/attachments listing)
-- `--out`: output JSON path
+---
 
-#### `filter`
+### `filter`
 
 Run a keyword-based filtering pipeline (with optional LLM filtering).
 
@@ -37,31 +63,39 @@ email-pipeline filter --in data/messages.json --out data/filtered.json \
   --rules examples/filter_rules.json
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--in` | path | **required** | Input messages JSON |
+| `--out` | path | **required** | Output filtered messages JSON |
+| `--rules` | path | `""` | Path to filter rules JSON (overrides defaults) |
+| `--llm-filter` | flag | off | Enable LLM filter stage |
+| `--llm-model` | string | `gpt-4o-mini` | OpenAI model name |
+| `--analytics` | flag | off | Write analytics files next to output |
 
-- `--in`: input messages JSON (created by `fetch` or compatible format)
-- `--out`: output messages JSON (filtered)
-- `--rules`: path to filter rules JSON (optional; overrides defaults)
-- `--llm-filter`: enable LLM filter stage (requires `.[llm]` + `OPENAI_API_KEY`)
-- `--llm-model`: OpenAI model name (default: `gpt-4o-mini`)
-- `--analytics`: write `filter_analytics.json` and `filter_analytics_report.txt` next to `--out`
+When `--analytics` is set, two extra files are written next to `--out`:
+- `filter_analytics.json`
+- `filter_analytics_report.txt`
 
-#### `extract`
+---
 
-Normalize emails into job opportunity objects (schema-backed if using LLM extractor).
+### `extract`
+
+Normalize emails into job opportunity objects.
 
 ```bash
 email-pipeline extract --in data/filtered.json --out data/opportunities.json
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--in` | path | **required** | Input messages JSON |
+| `--out` | path | **required** | Output opportunities JSON |
+| `--llm-extract` | flag | off | Enable LLM-based extraction |
+| `--llm-model` | string | `gpt-4o-mini` | OpenAI model name |
 
-- `--in`: input messages JSON
-- `--out`: output opportunities JSON
-- `--llm-extract`: enable LLM-based extraction (requires `.[llm]` + `OPENAI_API_KEY`)
-- `--llm-model`: OpenAI model name (default: `gpt-4o-mini`)
+---
 
-#### `render`
+### `render`
 
 Render Markdown files (with YAML frontmatter) from opportunities JSON.
 
@@ -69,14 +103,16 @@ Render Markdown files (with YAML frontmatter) from opportunities JSON.
 email-pipeline render --in data/opportunities.json --out out
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--in` | path | **required** | Input opportunities JSON |
+| `--out` | path | **required** | Output directory for Markdown files |
 
-- `--in`: input opportunities JSON
-- `--out`: output directory
+---
 
-#### `run`
+### `run`
 
-Fetch + filter + extract + render in one step.
+Full pipeline: fetch + filter + extract + render in one step.
 
 ```bash
 email-pipeline run \
@@ -86,49 +122,81 @@ email-pipeline run \
   --out-dir out
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--provider` | choice | `gmail` | Provider name |
+| `--window` | string | `1d` | Time window |
+| `--query` | string | `""` | Provider-specific query |
+| `--max-results` | int | unlimited | Cap results |
+| `--rules` | path | `""` | Path to filter rules JSON |
+| `--llm-filter` | flag | off | Enable LLM filter |
+| `--llm-extract` | flag | off | Enable LLM extraction |
+| `--llm-model` | string | `gpt-4o-mini` | OpenAI model name |
+| `--work-dir` | path | `data` | Where JSON artifacts are written |
+| `--out-dir` | path | `out` | Where Markdown files are written |
+| `--no-analytics` | flag | off | Disable analytics generation |
+| `--show-report` | flag | off | Print analytics report to stdout |
 
-- `--provider`, `--window`, `--query`, `--max-results`: same intent as `fetch`
-- `--rules`, `--llm-filter`, `--llm-extract`, `--llm-model`: same intent as `filter`/`extract`
-- `--work-dir`: where JSON artifacts are written (default: `data`)
-- `--out-dir`: where Markdown is written (default: `out`)
-- `--no-analytics`: disable analytics generation
-- `--show-report`: print the analytics report to stdout
+---
 
-#### `analytics`
+### `analytics`
 
 Generate analytics from existing data files (useful when iterating on rules).
 
 ```bash
-email-pipeline analytics --messages data/messages.json --opportunities data/opportunities.json --out-dir data
+email-pipeline analytics \
+  --messages data/messages.json \
+  --opportunities data/opportunities.json \
+  --out-dir data
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--messages` | path | -- | Path to messages JSON |
+| `--filtered` | path | -- | (reserved, currently unused) |
+| `--opportunities` | path | -- | Path to opportunities JSON |
+| `--rules` | path | `""` | Rules JSON for re-filtering messages |
+| `--out-dir` | path | `.` | Output directory for analytics files |
 
-- `--messages`: messages JSON file
-- `--filtered`: (currently unused by the command implementation; safe to omit)
-- `--opportunities`: opportunities JSON file
-- `--rules`: rules JSON path (used if re-filtering messages)
-- `--out-dir`: output directory (writes `analytics.json` + `analytics_report.txt`)
+Produces `analytics.json` and `analytics_report.txt` in the output directory.
 
-### Job analysis & resume matching (LLM)
+---
+
+## Job Analysis & Resume Matching (LLM)
 
 These commands require the optional dependency (`pip install -e ".[llm]"`) and
 `OPENAI_API_KEY`.
 
-#### `analyze`
+### `analyze`
 
 Extract structured requirements from opportunities.
 
 ```bash
-email-pipeline analyze --in data/opportunities.json --out data/job_analyses.json
+email-pipeline analyze \
+  --in data/opportunities.json \
+  --out data/job_analyses.json
 ```
 
-#### `match`
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--in` | path | **required** | Input opportunities JSON |
+| `--out` | path | **required** | Output job analyses JSON |
+| `--llm-model` | string | `gpt-4o-mini` | OpenAI model name |
+
+The output contains structured data per job:
+- Role summary (title, level, department)
+- Requirements (skills, experience, education, certifications)
+- Technical environment (languages, frameworks, databases, cloud, tools)
+- Culture indicators and compensation analysis
+- ATS keywords and role classification
+
+---
+
+### `match`
 
 Match a resume against one or many opportunities.
 
-Single job:
+**Single job:**
 
 ```bash
 email-pipeline match \
@@ -139,7 +207,7 @@ email-pipeline match \
   --format markdown
 ```
 
-Batch:
+**Batch (all jobs):**
 
 ```bash
 email-pipeline match \
@@ -150,20 +218,52 @@ email-pipeline match \
   --individual-reports
 ```
 
-#### `rank`
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--resume` | path | **required** | Resume file (JSON or Markdown) |
+| `--opportunities` | path | **required** | Opportunities JSON |
+| `--analyses` | path | -- | Pre-computed job analyses JSON (optional) |
+| `--job-index` | int | -- | Match single job by 0-based index |
+| `--out` | path | **required** | Output path (file for single, dir for batch) |
+| `--format` | choice | `markdown` | Output format for single match: `json` or `markdown` |
+| `--individual-reports` | flag | off | Generate per-job Markdown reports (batch mode) |
+| `--llm-model` | string | `gpt-4o-mini` | OpenAI model name |
+
+**Batch outputs:**
+- `match_results.json` -- all match data
+- `match_summary.md` -- overview report with rankings
+- `match_reports/*.md` -- individual reports (with `--individual-reports`)
+
+---
+
+### `rank`
 
 Filter and rank previously computed match results.
 
 ```bash
-email-pipeline rank --in out/matches/match_results.json --min-score 70 --top 10
+email-pipeline rank \
+  --in out/matches/match_results.json \
+  --min-score 70 \
+  --recommendation strong_apply,apply \
+  --top 10
 ```
 
-### Resume tailoring
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--in` | path | **required** | Input match results JSON |
+| `--out` | path | -- | Output filtered results JSON (optional) |
+| `--min-score` | float | -- | Minimum overall score |
+| `--grade` | string | -- | Comma-separated grades (`excellent,good`) |
+| `--recommendation` | string | -- | Comma-separated recommendations (`strong_apply,apply`) |
+| `--top` | int | -- | Limit to top N results |
 
-This command requires the `resume-builder` subtree package (installed
-automatically via `uv sync`).
+Results are always sorted by score descending and printed to stdout.
 
-#### `tailor`
+---
+
+## Resume Tailoring
+
+### `tailor`
 
 Tailor a resume for one or more job opportunities using match results. Generates
 tailored `.docx` files and detailed change reports.
@@ -176,26 +276,102 @@ email-pipeline tailor \
   --out output/tailored
 ```
 
-Options:
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--resume` | path | **required** | Original resume file (JSON or Markdown) |
+| `--match-results` | path | **required** | Match results JSON (from `match`) |
+| `--opportunities` | path | -- | Opportunities JSON (for job context) |
+| `--out` | path | **required** | Output directory |
+| `--min-score` | float | -- | Only tailor for jobs above this score |
+| `--recommendation` | string | -- | Comma-separated recommendations to filter |
+| `--top` | int | -- | Limit to top N results by score |
+| `--no-docx` | flag | off | Skip `.docx` generation |
 
-- `--resume`: path to the original resume file (JSON or Markdown)
-- `--match-results`: path to match results JSON (output of `match` command)
-- `--opportunities`: path to opportunities JSON (for job context in reports)
-- `--out`: output directory for tailored resumes, reports, and `.docx` files
-- `--min-score`: only tailor for jobs above this match score
-- `--recommendation`: comma-separated recommendations to filter (e.g. `strong_apply,apply`)
-- `--top`: limit to top N results by score
-- `--no-docx`: skip `.docx` generation (JSON/Markdown reports only)
-
-**Outputs per job:**
-
-- `<job_id>_resume.json` -- the tailored resume data
-- `<job_id>_report.json` -- structured tailoring report
-- `<job_id>_report.md` -- human-readable Markdown change report
-- `tailored_resume_<company>_<title>.docx` -- the generated Word document
+**Per-job outputs:**
+- `tailoring_reports/<job_id>_resume.json` -- tailored resume data
+- `tailoring_reports/<job_id>_report.json` -- structured change report
+- `tailoring_reports/<job_id>_report.md` -- Markdown change report
+- `tailored_resume_<company>_<title>.docx` -- Word document
 
 **Batch outputs:**
-
-- `tailoring_results.json` -- all tailoring results in one file
+- `tailoring_results.json` -- all results in one file
 - `tailoring_summary.md` -- summary across all tailored resumes
 
+---
+
+## resume-builder (vendor CLI)
+
+The vendor `resume-builder` package provides a standalone CLI for generating
+`.docx` resumes from JSON or legacy Python data.
+
+```bash
+resume-builder --help
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--json` | path | -- | Resume JSON file path. If omitted, uses legacy data. |
+| `--output` | path | `resume.docx` | Output `.docx` file name |
+
+### Examples
+
+```bash
+# From JSON schema
+resume-builder --json examples/sample_resume.json --output my_resume.docx
+
+# Python API
+python -c "
+from resume_builder.schema_adapter import ResumeSchemaAdapter
+from resume_builder.cli import build_resume
+
+person = ResumeSchemaAdapter.from_json_file('examples/sample_resume.json')
+doc = build_resume(person)
+doc.save('my_resume.docx')
+"
+```
+
+---
+
+## End-to-end workflow
+
+A typical complete workflow:
+
+```bash
+# 1. Fetch emails
+email-pipeline fetch --provider gmail --window 2d --out data/messages.json
+
+# 2. Filter for job opportunities
+email-pipeline filter --in data/messages.json --out data/filtered.json \
+  --rules examples/filter_rules.json --analytics
+
+# 3. Extract structured opportunities
+email-pipeline extract --in data/filtered.json --out data/opportunities.json
+
+# 4. Render Markdown
+email-pipeline render --in data/opportunities.json --out out
+
+# 5. Analyze jobs (LLM)
+email-pipeline analyze --in data/opportunities.json --out data/job_analyses.json
+
+# 6. Match resume against all jobs (LLM)
+email-pipeline match \
+  --resume examples/sample_resume.json \
+  --opportunities data/opportunities.json \
+  --analyses data/job_analyses.json \
+  --out out/matches \
+  --individual-reports
+
+# 7. Rank and filter matches
+email-pipeline rank \
+  --in out/matches/match_results.json \
+  --min-score 70 --top 10
+
+# 8. Tailor resume for top matches
+email-pipeline tailor \
+  --resume examples/sample_resume.json \
+  --match-results out/matches/match_results.json \
+  --opportunities data/opportunities.json \
+  --out output/tailored \
+  --recommendation strong_apply,apply \
+  --top 5
+```
