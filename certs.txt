@@ -1,0 +1,60 @@
+*New* AWS Certified Solutions Architect - Associate 2020
+Udemy for Business
+Oct 2020
+Modern Web Scraping with Python
+Udemy for Business
+Dec 2020
+Nuxt.js: Vue.js on Steroids
+Udemy for Business
+Dec 2020
+SANS: 6 CPEs Certificate of Participation
+SANS Institute
+Dec 2020
+Complete Flexbox Course: Master CSS3 Flexbox for Good
+Udemy for Business
+Feb 2021
+DESIGN RULES: Principles + Practices for Great UI Design
+Udemy for Business
+Feb 2021
+Full Cryptocurrency Course: Bitcoin Ethereum & Blockchain
+Udemy for Business
+Mar 2021
+Sketching for UX Designers
+Udemy for Business
+Mar 2021
+Ethereum and Solidity: The Complete Developer's Guide
+Udemy for Business
+Jun 2021
+Instagram Marketing 2021: Complete Guide To Instagram Growth
+Udemy for Business
+Jun 2021
+Recursion Backtracking and Dynamic Programming in Python
+Udemy for Business
+Jul 2021
+AWS Partner: Accreditation (Business)
+Amazon Web Services (AWS)
+Sep 2021
+AWS Partner: Accreditation (Technical)
+Amazon Web Services (AWS)
+Sep 2021
+AWS Partner: Cloud Economics Accreditation
+Amazon Web Services (AWS)
+Sep 2021
+AWS Certified Cloud Practitioner
+Amazon Web Services (AWS)
+Oct 2021
+The Complete Traefik Training Course
+Udemy for Business
+Jan 2022
+Blockchain Security
+Infosec
+March 2022
+AWS Certified Solutions Architect Associate
+Amazon Web Services (AWS)
+April 2022
+Google Cloud Digital Leader
+Google
+May 2022
+Design Patterns in Python
+Udemy
+Feb 2023
