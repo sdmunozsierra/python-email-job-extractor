@@ -1,3 +1,14 @@
+"""Extraction module -- turn raw email messages into structured job opportunities.
+
+Provides a ``BaseExtractor`` interface and two implementations:
+
+- :class:`RuleBasedExtractor` -- deterministic regex/heuristic extraction
+- :class:`LLMExtractor` -- schema-driven extraction via OpenAI
+
+The :func:`render_markdown` helper converts a job opportunity dict into
+Markdown with YAML frontmatter.
+"""
+
 from .extractor import BaseExtractor
 from .llm_extractor import LLMExtractor
 from .markdown import render_markdown
