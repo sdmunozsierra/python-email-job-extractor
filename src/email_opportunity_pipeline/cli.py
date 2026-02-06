@@ -883,8 +883,26 @@ def _cmd_run_all(args: argparse.Namespace) -> None:
     reply_label = "DRY RUN" if dry_run else "SENDING"
     print(f"[8/8 reply]   {reply_label} {len(drafts)} email(s)...")
 
+    # Recipient override / audit addresses
+    override_to = getattr(args, "override_to", None)
+    cc = getattr(args, "cc", None)
+    bcc = getattr(args, "bcc", None)
+
+    if override_to:
+        print(f"              Recipient override: all emails -> {override_to}")
+    if cc:
+        print(f"              CC: {', '.join(cc)}")
+    if bcc:
+        print(f"              BCC: {', '.join(bcc)}")
+
     sender = GmailSender()
-    reply_results = sender.send_batch(drafts, dry_run=dry_run)
+    reply_results = sender.send_batch(
+        drafts,
+        dry_run=dry_run,
+        override_to=override_to,
+        cc=cc,
+        bcc=bcc,
+    )
 
     write_reply_results(replies_dir / "reply_results.json", reply_results)
     report = render_send_report(reply_results)
@@ -1115,9 +1133,27 @@ def _cmd_reply(args: argparse.Namespace) -> None:
     mode_label = "DRY RUN" if dry_run else "SENDING"
     print(f"\n--- {mode_label}: {len(drafts)} email(s) ---\n")
 
+    # Parse recipient overrides
+    override_to = getattr(args, "override_to", None)
+    cc = getattr(args, "cc", None)
+    bcc = getattr(args, "bcc", None)
+
+    if override_to:
+        print(f"  Recipient override: all emails -> {override_to}")
+    if cc:
+        print(f"  CC: {', '.join(cc)}")
+    if bcc:
+        print(f"  BCC: {', '.join(bcc)}")
+
     # Send / dry-run
     sender = GmailSender()
-    results = sender.send_batch(drafts, dry_run=dry_run)
+    results = sender.send_batch(
+        drafts,
+        dry_run=dry_run,
+        override_to=override_to,
+        cc=cc,
+        bcc=bcc,
+    )
 
     # Output
     out_dir = Path(args.out)
@@ -1158,6 +1194,12 @@ def _print_reply_summary(results: list, dry_run: bool) -> None:
 
         print(f"\n{i}. {status_icon} {d.job_title} at {d.company}")
         print(f"   To: {d.to}")
+        if d.original_to:
+            print(f"   Original To: {d.original_to} (overridden)")
+        if d.cc:
+            print(f"   CC: {', '.join(d.cc)}")
+        if d.bcc:
+            print(f"   BCC: {', '.join(d.bcc)}")
         if r.gmail_message_id:
             print(f"   Gmail ID: {r.gmail_message_id}")
         if r.error:
@@ -1561,6 +1603,24 @@ def main() -> None:
     run_all_behaviour.add_argument("--llm-model", default="gpt-4o-mini",
                                    help="LLM model for all LLM stages (default: %(default)s)")
 
+    # -- Recipient override & audit --
+    run_all_recipient = run_all.add_argument_group("recipient override and audit")
+    run_all_recipient.add_argument(
+        "--override-to",
+        help="Redirect ALL reply emails to this address instead of the "
+             "original recruiter (useful for testing).  The original "
+             "recipient is preserved in reports."
+    )
+    run_all_recipient.add_argument(
+        "--cc", nargs="+", metavar="ADDR",
+        help="One or more CC addresses added to every reply email"
+    )
+    run_all_recipient.add_argument(
+        "--bcc", nargs="+", metavar="ADDR",
+        help="One or more BCC addresses added to every reply email "
+             "(hidden from the primary recipient)"
+    )
+
     run_all.set_defaults(func=_cmd_run_all)
 
     # Analytics command (standalone)
@@ -1778,6 +1838,22 @@ def main() -> None:
     reply.add_argument(
         "--index", type=int,
         help="Send only the draft at this index (0-based)"
+    )
+    reply.add_argument(
+        "--override-to",
+        help="Redirect ALL emails to this address instead of the original "
+             "recruiter (useful for testing).  The original recipient is "
+             "preserved in reports."
+    )
+    reply.add_argument(
+        "--cc", nargs="+", metavar="ADDR",
+        help="One or more CC addresses added to every email (e.g. for "
+             "audit / manager visibility)"
+    )
+    reply.add_argument(
+        "--bcc", nargs="+", metavar="ADDR",
+        help="One or more BCC addresses added to every email (hidden from "
+             "the primary recipient, useful for audit trails)"
     )
     reply.set_defaults(func=_cmd_reply)
 
