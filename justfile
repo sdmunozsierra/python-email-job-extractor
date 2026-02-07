@@ -85,6 +85,9 @@ correlation_report := "correlation/report.md"
 @edit-preview file=drafts_preview:
   ${EDITOR:-vi} {{file}}
 
+@reply-send:
+  uv run email-pipeline reply --drafts {{drafts}} --out {{replies_dir}}
+
 @reply-send-to to:
   uv run email-pipeline reply --drafts {{drafts}} --out {{replies_dir}} --override-to {{to}}
 
