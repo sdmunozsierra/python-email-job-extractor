@@ -173,9 +173,6 @@ just run-all
 just reply-preview
 just edit-preview
 
-# send replies (optionally override recipients)
-just reply-send override_to=you@example.com
-
 # quick override-to send
 just reply-send-to you@example.com
 ```
