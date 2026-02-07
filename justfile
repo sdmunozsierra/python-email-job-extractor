@@ -85,10 +85,12 @@ correlation_report := "correlation/report.md"
 @edit-preview file=drafts_preview:
   ${EDITOR:-vi} {{file}}
 
-@reply-send override_to="" cc="" bcc="":
+@reply-send raw="" override_to="" cc="" bcc="":
+  raw_value="{{raw}}"
   override_to_cleaned="{{override_to}}"
   cc_cleaned="{{cc}}"
   bcc_cleaned="{{bcc}}"
+  if [[ -z "$override_to_cleaned" && -n "$raw_value" ]]; then override_to_cleaned="$raw_value"; fi
   override_to_cleaned="${override_to_cleaned#override_to=}"
   cc_cleaned="${cc_cleaned#cc=}"
   bcc_cleaned="${bcc_cleaned#bcc=}"
