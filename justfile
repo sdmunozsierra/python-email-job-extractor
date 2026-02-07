@@ -85,13 +85,18 @@ correlation_report := "correlation/report.md"
 @edit-preview file=drafts_preview:
   ${EDITOR:-vi} {{file}}
 
-@reply-send drafts=drafts out=replies_dir override_to="" cc="" bcc="":
-  uv run email-pipeline reply \
-    --drafts {{drafts}} \
-    --out {{out}} \
-    {{if override_to != "" {"--override-to " + override_to} else {""}}} \
-    {{if cc != "" {"--cc " + cc} else {""}}} \
-    {{if bcc != "" {"--bcc " + bcc} else {""}}}
+@reply-send override_to="" cc="" bcc="":
+  override_to_cleaned="{{override_to}}"
+  cc_cleaned="{{cc}}"
+  bcc_cleaned="{{bcc}}"
+  override_to_cleaned="${override_to_cleaned#override_to=}"
+  cc_cleaned="${cc_cleaned#cc=}"
+  bcc_cleaned="${bcc_cleaned#bcc=}"
+  args=()
+  if [[ -n "$override_to_cleaned" ]]; then args+=(--override-to "$override_to_cleaned"); fi
+  if [[ -n "$cc_cleaned" ]]; then args+=(--cc "$cc_cleaned"); fi
+  if [[ -n "$bcc_cleaned" ]]; then args+=(--bcc "$bcc_cleaned"); fi
+  uv run email-pipeline reply --drafts {{drafts}} --out {{replies_dir}} "${args[@]}"
 
 @render in=opportunities out=rendered_dir:
   uv run email-pipeline render --in {{in}} --out {{out}}
