@@ -100,6 +100,9 @@ correlation_report := "correlation/report.md"
   if [[ -n "$bcc_cleaned" ]]; then args+=(--bcc "$bcc_cleaned"); fi
   uv run email-pipeline reply --drafts {{drafts}} --out {{replies_dir}} "${args[@]}"
 
+@reply-send-to to:
+  uv run email-pipeline reply --drafts {{drafts}} --out {{replies_dir}} --override-to {{to}}
+
 @render in=opportunities out=rendered_dir:
   uv run email-pipeline render --in {{in}} --out {{out}}
 
