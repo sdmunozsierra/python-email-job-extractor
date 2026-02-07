@@ -12,10 +12,15 @@ filtered := work_dir + "/filtered.json"
 opportunities := work_dir + "/opportunities.json"
 analyses := work_dir + "/job_analyses.json"
 match_results := out_dir + "/matches/match_results.json"
+matches_dir := out_dir + "/matches"
+ranked_dir := out_dir + "/ranked"
 tailored_dir := out_dir + "/tailored"
 replies_dir := out_dir + "/replies"
 drafts := replies_dir + "/drafts.json"
 drafts_preview := replies_dir + "/drafts_preview.md"
+rendered_dir := out_dir + "/rendered"
+analytics_path := work_dir + "/analytics.json"
+correlation_report := "correlation/report.md"
 
 @help:
   just --list
@@ -43,7 +48,7 @@ drafts_preview := replies_dir + "/drafts_preview.md"
 @analyze in=opportunities out=analyses:
   uv run email-pipeline analyze --in {{in}} --out {{out}}
 
-@match in=opportunities resume=resume out=out_dir + "/matches" min_score="" recommendation="":
+@match in=opportunities resume=resume out=matches_dir min_score="" recommendation="":
   uv run email-pipeline match \
     --in {{in}} \
     --resume {{resume}} \
@@ -51,7 +56,7 @@ drafts_preview := replies_dir + "/drafts_preview.md"
     {{if min_score != "" {"--min-score " + min_score} else {""}}} \
     {{if recommendation != "" {"--recommendation " + recommendation} else {""}}}
 
-@rank in=match_results out=out_dir + "/ranked":
+@rank in=match_results out=ranked_dir:
   uv run email-pipeline rank --in {{in}} --out {{out}}
 
 @tailor match_results=match_results opportunities=opportunities resume=resume out=tailored_dir recommendation="" top="":
@@ -88,10 +93,10 @@ drafts_preview := replies_dir + "/drafts_preview.md"
     {{if cc != "" {"--cc " + cc} else {""}}} \
     {{if bcc != "" {"--bcc " + bcc} else {""}}}
 
-@render in=opportunities out=out_dir + "/rendered":
+@render in=opportunities out=rendered_dir:
   uv run email-pipeline render --in {{in}} --out {{out}}
 
-@analytics in=opportunities out=work_dir + "/analytics.json":
+@analytics in=opportunities out=analytics_path:
   uv run email-pipeline analytics --in {{in}} --out {{out}}
 
 @correlate work_dir=work_dir out_dir=out_dir out="correlation" individual_cards="--individual-cards" full_report="--full-report":
@@ -102,5 +107,5 @@ drafts_preview := replies_dir + "/drafts_preview.md"
     {{individual_cards}} \
     {{full_report}}
 
-@open-correlation report="correlation/report.md":
+@open-correlation report=correlation_report:
   ${EDITOR:-vi} {{report}}
