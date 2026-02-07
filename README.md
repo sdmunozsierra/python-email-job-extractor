@@ -155,6 +155,28 @@ uv pip install -e ".[llm]"
 pip install -e ".[llm]"
 ```
 
+## Justfile recipes (optional)
+
+If you use [`just`](https://github.com/casey/just), a top-level `justfile`
+provides minimal, `uv run`-backed recipes for the common pipeline stages.
+The defaults match the docs (`data/` + `output/`, sample resume/questionnaire),
+so you can run the pipeline without retyping long flag lists.
+
+```bash
+# list recipes
+just --list
+
+# full dry-run pipeline
+just run-all
+
+# preview replies, then edit drafts in your editor
+just reply-preview
+just edit-preview
+
+# send replies (optionally override recipients)
+just reply-send override_to=you@example.com
+```
+
 ## LLM setup (optional)
 
 LLM features (LLM filter, LLM extraction, job analysis, resume matching) use the
