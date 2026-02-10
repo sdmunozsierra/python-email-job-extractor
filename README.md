@@ -38,6 +38,10 @@ built-in dry-run mode for safe e2e testing before going live.
   the complete lifecycle of each opportunity at a glance.
 - **One-command e2e**: `run-all` executes the entire pipeline from fetch
   through reply in a single invocation, with a built-in dry-run mode.
+- **Streamlit Dashboard**: Interactive web UI for exploring pipeline
+  artifacts, match results, tailored resumes, and reply drafts.
+- **Justfile**: Task runner shortcuts for common development and pipeline
+  commands (requires [just](https://github.com/casey/just)).
 
 ## Project layout
 
@@ -92,6 +96,10 @@ src/email_opportunity_pipeline/
     models.py              # CorrelatedOpportunity, CorrelationSummary
     correlator.py          # OpportunityCorrelator engine
     report.py              # Markdown correlation report renderer
+  ui/                      # Streamlit Web Dashboard
+    __init__.py
+    app.py                 # Main Streamlit application
+    state.py               # Artifact discovery and data loading helpers
   schemas/
     job_opportunity.schema.json
     resume.schema.json
@@ -153,6 +161,19 @@ uv pip install -e ".[llm]"
 
 # pip
 pip install -e ".[llm]"
+```
+
+### Optional Streamlit UI
+
+```bash
+# uv
+uv pip install -e ".[ui]"
+
+# pip
+pip install -e ".[ui]"
+
+# Or install everything at once
+pip install -e ".[llm,ui]"
 ```
 
 ## LLM setup (optional)
@@ -569,6 +590,68 @@ Each opportunity is tracked through these pipeline stages:
 | Tailored | ✂️ | Resume tailored for job |
 | Composed | ✉️ | Reply email drafted |
 | Replied | ✅ | Reply sent (or dry-run) |
+
+---
+
+## Streamlit Web Dashboard
+
+The project includes an interactive web UI built with Streamlit for
+exploring pipeline artifacts without the command line.
+
+### Launch
+
+```bash
+# Via the CLI (recommended)
+email-pipeline ui
+
+# Or directly with Streamlit
+streamlit run src/email_opportunity_pipeline/ui/app.py
+
+# Custom port
+email-pipeline ui --port 8502
+```
+
+### Dashboard Pages
+
+| Page | Description |
+|------|-------------|
+| Dashboard | Overview metrics (emails, opportunities, matches, replies) with top matches |
+| Messages | Browse fetched and filtered emails in a searchable table |
+| Opportunities | View extracted job opportunities with details |
+| Match Results | Score distribution chart, rankings, and detailed match data |
+| Tailored Resumes | Changes applied per job with before/after diffs |
+| Reply Drafts | Preview composed reply emails with attachments |
+| Reply Results | Send status (sent, dry-run, failed) per email |
+| Correlation | Unified pipeline view linking all artifacts per opportunity |
+| Analytics | Filter metrics, domain analysis, score distribution, and insights |
+
+The dashboard auto-discovers artifacts from the `data/` and `output/`
+directories (configurable in the sidebar).  Pages appear in the navigation
+only when their corresponding data files exist on disk.
+
+---
+
+## Justfile
+
+A [justfile](https://github.com/casey/just) is included for common
+development and pipeline tasks.  Install `just` via your package manager,
+then run `just` to list all available recipes.
+
+### Key recipes
+
+```bash
+just install           # Set up venv and install all extras (uv)
+just install-pip       # Same using pip
+just test              # Run the test suite
+just lint              # Lint with ruff
+just fmt               # Format with ruff
+just ui                # Launch the Streamlit dashboard
+just run-all <args>    # Run the full pipeline
+just quickstart-dry    # Dry-run with sample resume
+just clean             # Remove data/ and output/
+```
+
+Run `just --list` for the complete list.
 
 ---
 

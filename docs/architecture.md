@@ -47,6 +47,7 @@ dry-run (default) or live send (`--send`) mode.
 | Models | `models.py` | Core dataclasses (EmailMessage, FilterOutcome) |
 | Time Window | `time_window.py` | Time window parsing (30m, 6h, 2d) |
 | Analytics | `analytics.py` | Pipeline analytics and reporting |
+| UI | `ui/` | Streamlit web dashboard for exploring artifacts |
 | Vendor | `vendor/resume-builder/` | Git subtree -- `.docx` generation |
 
 ---
@@ -444,6 +445,47 @@ email-pipeline correlate --> correlation/
                                opportunity_cards/<job_id>.md
                                correlation_full_report.md
 ```
+
+---
+
+## Streamlit Web Dashboard
+
+The `ui/` module provides an interactive web interface for exploring pipeline
+artifacts.  It reads the same JSON files produced by the CLI commands.
+
+### Module layout
+
+| File | Description |
+|------|-------------|
+| `ui/__init__.py` | Package init |
+| `ui/app.py` | Main Streamlit application (page routing, layout, widgets) |
+| `ui/state.py` | Artifact discovery and JSON loading helpers |
+
+### Artifact discovery
+
+`state.discover_artifacts(work_dir, out_dir)` scans the standard directory
+layout produced by `run-all` and returns a dict of artifact name to `Path`.
+The dashboard uses this to conditionally show navigation pages only when
+their data exists on disk.
+
+### Pages
+
+| Page | Data source | Key widgets |
+|------|-------------|-------------|
+| Dashboard | messages, filtered, opportunities, matches | Metric cards, top matches |
+| Messages | messages.json, filtered.json | Dataframe, JSON detail expander |
+| Opportunities | opportunities.json | Dataframe, two-column detail view |
+| Match Results | match_results.json | Score histogram, ranked table, detail |
+| Tailored Resumes | tailoring_results.json | Change table, before/after diffs |
+| Reply Drafts | drafts.json | Table, email preview with body |
+| Reply Results | reply_results.json | Status breakdown, send report |
+| Correlation | correlation.json | Stage bar chart, unified table |
+| Analytics | analytics.json | Metrics, domain/date charts, report |
+
+### Launch
+
+The UI can be launched via the CLI (`email-pipeline ui`) or directly with
+`streamlit run src/email_opportunity_pipeline/ui/app.py`.
 
 ---
 
