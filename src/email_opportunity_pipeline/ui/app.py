@@ -9,6 +9,7 @@ Launch with:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -34,6 +35,19 @@ from email_opportunity_pipeline.ui.state import (
     load_reply_results,
     load_tailoring_results,
     load_correlation,
+)
+from email_opportunity_pipeline.ui.runner import (
+    RunResult,
+    cmd_fetch,
+    cmd_filter,
+    cmd_extract,
+    cmd_analyze,
+    cmd_match,
+    cmd_tailor,
+    cmd_compose,
+    cmd_reply,
+    cmd_correlate,
+    cmd_analytics,
 )
 
 # ---------------------------------------------------------------------------
@@ -65,33 +79,73 @@ artifacts = discover_artifacts(work_dir, out_dir)
 if artifacts:
     st.sidebar.success(f"{len(artifacts)} artifact(s) found")
 else:
-    st.sidebar.warning("No artifacts found. Run the pipeline first, or adjust the directories above.")
+    st.sidebar.warning("No artifacts found -- run the pipeline first, or adjust directories above.")
 
-# Build navigation from available data
-pages = ["Dashboard"]
-if "messages" in artifacts or "filtered" in artifacts:
-    pages.append("Messages")
-if "opportunities" in artifacts:
-    pages.append("Opportunities")
-if "match_results" in artifacts:
-    pages.append("Match Results")
-if "tailoring_results" in artifacts:
-    pages.append("Tailored Resumes")
-if "drafts" in artifacts:
-    pages.append("Reply Drafts")
-if "reply_results" in artifacts:
-    pages.append("Reply Results")
-if "correlation" in artifacts:
-    pages.append("Correlation")
-if "analytics" in artifacts:
-    pages.append("Analytics")
+# Build navigation -- always show all pages so users can trigger actions
+pages = [
+    "Dashboard",
+    "Messages",
+    "Opportunities",
+    "Match Results",
+    "Tailored Resumes",
+    "Reply Drafts",
+    "Reply Results",
+    "Correlation",
+    "Analytics",
+]
 
 page = st.sidebar.radio("Navigate", pages)
 
 st.sidebar.markdown("---")
 st.sidebar.caption("Artifacts on disk:")
-for name, path in sorted(artifacts.items()):
-    st.sidebar.caption(f"  {name}: `{path}`")
+if artifacts:
+    for name, path in sorted(artifacts.items()):
+        st.sidebar.caption(f"  {name}: `{path}`")
+else:
+    st.sidebar.caption("  (none)")
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+def _show_result(result: RunResult) -> None:
+    """Display the result of a pipeline command."""
+    if result.ok:
+        st.success(f"Command succeeded (exit {result.returncode})")
+    else:
+        st.error(f"Command failed (exit {result.returncode})")
+    if result.stdout:
+        with st.expander("stdout", expanded=not result.ok):
+            st.code(result.stdout, language="text")
+    if result.stderr:
+        with st.expander("stderr", expanded=not result.ok):
+            st.code(result.stderr, language="text")
+    st.caption(f"`{' '.join(result.command)}`")
+
+
+def _file_picker(label: str, key: str, default: str = "", help_text: str = "") -> str:
+    """Text input that acts as a simple file path selector."""
+    return st.text_input(label, value=default, key=key, help=help_text)
+
+
+def _resume_picker(key_prefix: str) -> str:
+    """Reusable resume file picker."""
+    return _file_picker(
+        "Resume file (JSON or Markdown)",
+        key=f"{key_prefix}_resume",
+        default="examples/sample_resume.json",
+        help_text="Path to your resume file",
+    )
+
+
+def _llm_model_picker(key_prefix: str) -> str:
+    """Reusable LLM model selector."""
+    return st.selectbox(
+        "LLM model",
+        ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
+        key=f"{key_prefix}_llm_model",
+    )
 
 
 # ============================================================================
@@ -148,6 +202,44 @@ def _page_dashboard() -> None:
         with st.expander("View full analytics report"):
             st.code(report_text, language="text")
 
+    # ----- Quick actions -----
+    st.markdown("---")
+    st.subheader("Quick Actions")
+
+    qa1, qa2, qa3 = st.columns(3)
+    with qa1:
+        window = st.selectbox("Fetch window", ["30m", "1h", "6h", "1d", "2d", "7d"], index=3, key="dash_window")
+        if st.button("Fetch emails", key="dash_fetch"):
+            with st.spinner("Fetching emails..."):
+                result = cmd_fetch(provider="gmail", window=window, out=str(work_dir / "messages.json"))
+            _show_result(result)
+            if result.ok:
+                st.rerun()
+    with qa2:
+        if st.button("Filter + Extract", key="dash_filter_extract"):
+            ok = True
+            with st.spinner("Filtering..."):
+                r1 = cmd_filter(input_path=str(work_dir / "messages.json"), out=str(work_dir / "filtered.json"))
+            _show_result(r1)
+            ok = r1.ok
+            if ok:
+                with st.spinner("Extracting..."):
+                    r2 = cmd_extract(input_path=str(work_dir / "filtered.json"), out=str(work_dir / "opportunities.json"))
+                _show_result(r2)
+            if ok and r2.ok:
+                st.rerun()
+    with qa3:
+        if st.button("Correlate all", key="dash_correlate"):
+            with st.spinner("Correlating..."):
+                result = cmd_correlate(
+                    out=str(out_dir / "correlation"),
+                    work_dir=str(work_dir),
+                    out_dir=str(out_dir),
+                )
+            _show_result(result)
+            if result.ok:
+                st.rerun()
+
 
 # ============================================================================
 # Messages
@@ -156,26 +248,71 @@ def _page_dashboard() -> None:
 def _page_messages() -> None:
     st.header("Email Messages")
 
+    # ----- Fetch action -----
+    with st.expander("Fetch new emails", expanded="messages" not in artifacts):
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1:
+            provider = st.selectbox("Provider", ["gmail"], key="msg_provider")
+        with fc2:
+            window = st.selectbox("Time window", ["30m", "1h", "6h", "1d", "2d", "7d"], index=3, key="msg_window")
+        with fc3:
+            max_results = st.number_input("Max results (0 = unlimited)", 0, 10000, 0, key="msg_max")
+        query = st.text_input("Gmail search query (optional)", key="msg_query")
+
+        if st.button("Fetch", key="msg_fetch_btn"):
+            with st.spinner("Fetching emails from Gmail..."):
+                result = cmd_fetch(
+                    provider=provider,
+                    window=window,
+                    out=str(work_dir / "messages.json"),
+                    query=query,
+                    max_results=max_results or None,
+                )
+            _show_result(result)
+            if result.ok:
+                st.rerun()
+
+    # ----- Filter action -----
+    if "messages" in artifacts:
+        with st.expander("Filter messages"):
+            fc1, fc2 = st.columns(2)
+            with fc1:
+                rules = _file_picker("Filter rules JSON (optional)", "msg_rules", default="examples/filter_rules.json")
+            with fc2:
+                use_llm = st.checkbox("Use LLM filter", key="msg_llm_filter")
+            if st.button("Run filter", key="msg_filter_btn"):
+                with st.spinner("Filtering..."):
+                    result = cmd_filter(
+                        input_path=str(artifacts["messages"]),
+                        out=str(work_dir / "filtered.json"),
+                        rules=rules if Path(rules).exists() else "",
+                        llm_filter=use_llm,
+                    )
+                _show_result(result)
+                if result.ok:
+                    st.rerun()
+
+    # ----- Data display -----
     tab_all, tab_filtered = st.tabs(["All Fetched", "Filtered (passed)"])
 
     with tab_all:
         if "messages" in artifacts:
             messages = load_messages(artifacts["messages"])
             st.write(f"**{len(messages)}** messages fetched")
-            _render_messages_table(messages)
+            _render_messages_table(messages, key_prefix="all")
         else:
-            st.info("No messages.json found.")
+            st.info("No messages.json found. Use the Fetch action above.")
 
     with tab_filtered:
         if "filtered" in artifacts:
             filtered = load_messages(artifacts["filtered"])
             st.write(f"**{len(filtered)}** messages passed filter")
-            _render_messages_table(filtered)
+            _render_messages_table(filtered, key_prefix="filtered")
         else:
-            st.info("No filtered.json found.")
+            st.info("No filtered.json found. Run the filter first.")
 
 
-def _render_messages_table(messages: list) -> None:
+def _render_messages_table(messages: list, *, key_prefix: str) -> None:
     if not messages:
         st.info("No messages to display.")
         return
@@ -192,12 +329,13 @@ def _render_messages_table(messages: list) -> None:
         })
     st.dataframe(rows, use_container_width=True)
 
-    # Detail expander
     with st.expander("Message details"):
-        idx = st.number_input("Message index", 0, max(len(messages) - 1, 0), 0, key="msg_detail_idx")
+        idx = st.number_input(
+            "Message index", 0, max(len(messages) - 1, 0), 0,
+            key=f"{key_prefix}_msg_detail_idx",
+        )
         if 0 <= idx < len(messages):
-            msg = messages[idx]
-            st.json(msg)
+            st.json(messages[idx])
 
 
 # ============================================================================
@@ -206,6 +344,31 @@ def _render_messages_table(messages: list) -> None:
 
 def _page_opportunities() -> None:
     st.header("Extracted Opportunities")
+
+    # ----- Extract action -----
+    with st.expander("Extract opportunities", expanded="opportunities" not in artifacts):
+        ec1, ec2 = st.columns(2)
+        with ec1:
+            input_src = "filtered" if "filtered" in artifacts else "messages"
+            extract_in = str(artifacts.get(input_src, work_dir / "filtered.json"))
+            st.caption(f"Input: `{extract_in}`")
+        with ec2:
+            use_llm = st.checkbox("Use LLM extraction", key="opp_llm_extract")
+        if st.button("Extract", key="opp_extract_btn"):
+            with st.spinner("Extracting opportunities..."):
+                result = cmd_extract(
+                    input_path=extract_in,
+                    out=str(work_dir / "opportunities.json"),
+                    llm_extract=use_llm,
+                )
+            _show_result(result)
+            if result.ok:
+                st.rerun()
+
+    if "opportunities" not in artifacts:
+        st.info("No opportunities.json found. Run extraction above or fetch + filter first.")
+        return
+
     opportunities = load_opportunities(artifacts["opportunities"])
     st.write(f"**{len(opportunities)}** opportunities extracted")
 
@@ -244,6 +407,47 @@ def _page_opportunities() -> None:
 
 def _page_match_results() -> None:
     st.header("Resume Match Results")
+
+    # ----- Analyze + Match actions -----
+    with st.expander("Run Analyze & Match", expanded="match_results" not in artifacts):
+        resume = _resume_picker("match")
+        llm_model = _llm_model_picker("match")
+
+        mc1, mc2 = st.columns(2)
+        with mc1:
+            if st.button("Analyze jobs", key="match_analyze_btn"):
+                if "opportunities" not in artifacts:
+                    st.warning("No opportunities found. Run extraction first.")
+                else:
+                    with st.spinner("Analyzing jobs with LLM..."):
+                        result = cmd_analyze(
+                            input_path=str(artifacts["opportunities"]),
+                            out=str(work_dir / "job_analyses.json"),
+                            llm_model=llm_model,
+                        )
+                    _show_result(result)
+        with mc2:
+            if st.button("Match resume", key="match_run_btn"):
+                if "opportunities" not in artifacts:
+                    st.warning("No opportunities found. Run extraction first.")
+                else:
+                    analyses = str(artifacts["job_analyses"]) if "job_analyses" in artifacts else ""
+                    with st.spinner("Matching resume against jobs..."):
+                        result = cmd_match(
+                            resume=resume,
+                            opportunities=str(artifacts["opportunities"]),
+                            analyses=analyses,
+                            out=str(out_dir / "matches"),
+                            llm_model=llm_model,
+                        )
+                    _show_result(result)
+                    if result.ok:
+                        st.rerun()
+
+    if "match_results" not in artifacts:
+        st.info("No match results found. Run the Match action above.")
+        return
+
     matches = load_match_results(artifacts["match_results"])
     st.write(f"**{len(matches)}** match results")
 
@@ -285,8 +489,7 @@ def _page_match_results() -> None:
         idx = st.number_input("Match index (sorted by score)", 0, max(len(matches) - 1, 0), 0, key="match_detail_idx")
         sorted_matches = sorted(matches, key=lambda x: x.get("overall_score", 0), reverse=True)
         if 0 <= idx < len(sorted_matches):
-            m = sorted_matches[idx]
-            st.json(m)
+            st.json(sorted_matches[idx])
 
     # Markdown summary
     if "match_summary" in artifacts:
@@ -301,6 +504,42 @@ def _page_match_results() -> None:
 
 def _page_tailored_resumes() -> None:
     st.header("Tailored Resumes")
+
+    # ----- Tailor action -----
+    with st.expander("Generate tailored resumes", expanded="tailoring_results" not in artifacts):
+        resume = _resume_picker("tailor")
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            min_score = st.number_input("Min score", 0.0, 100.0, 70.0, key="tailor_min_score")
+        with tc2:
+            recommendation = st.text_input("Recommendations (comma-sep)", value="strong_apply,apply", key="tailor_rec")
+        with tc3:
+            top_n = st.number_input("Top N (0 = all)", 0, 100, 5, key="tailor_top")
+        no_docx = st.checkbox("Skip .docx generation", key="tailor_no_docx")
+
+        if st.button("Tailor resumes", key="tailor_run_btn"):
+            if "match_results" not in artifacts:
+                st.warning("No match results found. Run matching first.")
+            else:
+                with st.spinner("Tailoring resumes..."):
+                    result = cmd_tailor(
+                        resume=resume,
+                        match_results=str(artifacts["match_results"]),
+                        out=str(out_dir / "tailored"),
+                        opportunities=str(artifacts.get("opportunities", "")),
+                        min_score=min_score if min_score > 0 else None,
+                        recommendation=recommendation,
+                        top=top_n if top_n > 0 else None,
+                        no_docx=no_docx,
+                    )
+                _show_result(result)
+                if result.ok:
+                    st.rerun()
+
+    if "tailoring_results" not in artifacts:
+        st.info("No tailoring results found. Run tailoring above.")
+        return
+
     results = load_tailoring_results(artifacts["tailoring_results"])
     st.write(f"**{len(results)}** tailored resumes generated")
 
@@ -349,6 +588,42 @@ def _page_tailored_resumes() -> None:
 
 def _page_reply_drafts() -> None:
     st.header("Reply Email Drafts")
+
+    # ----- Compose action -----
+    with st.expander("Compose reply emails", expanded="drafts" not in artifacts):
+        resume = _resume_picker("compose")
+        llm_model = _llm_model_picker("compose")
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            questionnaire = _file_picker("Questionnaire JSON", "compose_q", default="examples/questionnaire.json")
+        with cc2:
+            recommendation = st.text_input("Recommendations", value="strong_apply,apply", key="compose_rec")
+        top_n = st.number_input("Top N (0 = all)", 0, 100, 5, key="compose_top")
+
+        if st.button("Compose drafts", key="compose_run_btn"):
+            if "match_results" not in artifacts:
+                st.warning("No match results found. Run matching first.")
+            else:
+                with st.spinner("Composing reply emails..."):
+                    result = cmd_compose(
+                        resume=resume,
+                        match_results=str(artifacts["match_results"]),
+                        out=str(out_dir / "replies"),
+                        opportunities=str(artifacts.get("opportunities", "")),
+                        questionnaire=questionnaire if Path(questionnaire).exists() else "",
+                        tailored_dir=str(out_dir / "tailored") if "tailoring_results" in artifacts else "",
+                        recommendation=recommendation,
+                        top=top_n if top_n > 0 else None,
+                        llm_model=llm_model,
+                    )
+                _show_result(result)
+                if result.ok:
+                    st.rerun()
+
+    if "drafts" not in artifacts:
+        st.info("No drafts found. Compose reply emails above.")
+        return
+
     drafts = load_drafts(artifacts["drafts"])
     st.write(f"**{len(drafts)}** email drafts composed")
 
@@ -368,25 +643,42 @@ def _page_reply_drafts() -> None:
         })
     st.dataframe(rows, use_container_width=True)
 
-    st.subheader("Draft Preview")
+    # ----- Draft preview + edit -----
+    st.subheader("Draft Preview & Edit")
     idx = st.number_input("Draft index", 0, max(len(drafts) - 1, 0), 0, key="draft_preview_idx")
     if 0 <= idx < len(drafts):
         d = drafts[idx]
         st.markdown(f"**To:** {d.get('to', 'N/A')}")
-        st.markdown(f"**Subject:** {d.get('subject', 'N/A')}")
+
+        # Editable subject and body
+        new_subject = st.text_input("Subject", value=d.get("subject", ""), key="draft_edit_subject")
+        new_body = st.text_area("Body", value=d.get("body", ""), height=300, key="draft_edit_body")
+
         if d.get("in_reply_to"):
             st.caption(f"In-Reply-To: {d['in_reply_to']}")
-        st.markdown("---")
-        st.markdown(d.get("body", "(empty body)"))
         if d.get("attachment_paths"):
             st.markdown("**Attachments:**")
             for att in d["attachment_paths"]:
                 st.caption(f"  {att}")
 
+        # Save edits back to the drafts JSON file
+        if st.button("Save edits to drafts.json", key="draft_save_btn"):
+            drafts[idx]["subject"] = new_subject
+            drafts[idx]["body"] = new_body
+            _save_drafts(artifacts["drafts"], drafts)
+            st.success(f"Draft {idx} updated and saved.")
+
     if "drafts_preview" in artifacts:
         with st.expander("Full Drafts Preview (Markdown)"):
             md = artifacts["drafts_preview"].read_text(encoding="utf-8")
             st.markdown(md)
+
+
+def _save_drafts(path: Path, drafts: list) -> None:
+    """Write modified drafts back to the JSON file."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["drafts"] = drafts
+    path.write_text(json.dumps(raw, indent=2), encoding="utf-8")
 
 
 # ============================================================================
@@ -395,6 +687,42 @@ def _page_reply_drafts() -> None:
 
 def _page_reply_results() -> None:
     st.header("Reply Send Results")
+
+    # ----- Send / dry-run action -----
+    with st.expander("Send or preview replies", expanded="reply_results" not in artifacts):
+        rc1, rc2 = st.columns(2)
+        with rc1:
+            dry_run = st.checkbox("Dry run (preview only)", value=True, key="reply_dry_run")
+        with rc2:
+            send_index = st.number_input("Send only index (-1 = all)", -1, 100, -1, key="reply_index")
+        rc3, rc4 = st.columns(2)
+        with rc3:
+            override_to = st.text_input("Override recipient (testing)", key="reply_override")
+        with rc4:
+            bcc = st.text_input("BCC (audit)", key="reply_bcc")
+
+        if st.button("Send / preview", key="reply_send_btn"):
+            drafts_path = artifacts.get("drafts")
+            if not drafts_path:
+                st.warning("No drafts found. Compose emails first.")
+            else:
+                with st.spinner("Sending/previewing emails..."):
+                    result = cmd_reply(
+                        drafts=str(drafts_path),
+                        out=str(out_dir / "replies"),
+                        dry_run=dry_run,
+                        index=send_index if send_index >= 0 else None,
+                        override_to=override_to,
+                        bcc=bcc,
+                    )
+                _show_result(result)
+                if result.ok:
+                    st.rerun()
+
+    if "reply_results" not in artifacts:
+        st.info("No reply results found. Send or dry-run above.")
+        return
+
     results = load_reply_results(artifacts["reply_results"])
     st.write(f"**{len(results)}** reply results")
 
@@ -416,8 +744,8 @@ def _page_reply_results() -> None:
     st.dataframe(rows, use_container_width=True)
 
     # Status breakdown
-    statuses = [r.get("status", "unknown") for r in results]
     from collections import Counter
+    statuses = [r.get("status", "unknown") for r in results]
     status_counts = Counter(statuses)
     col1, col2, col3 = st.columns(3)
     col1.metric("Sent", status_counts.get("sent", 0))
@@ -436,6 +764,37 @@ def _page_reply_results() -> None:
 
 def _page_correlation() -> None:
     st.header("Job Opportunity Correlation")
+
+    # ----- Correlate action -----
+    with st.expander("Run correlation", expanded="correlation" not in artifacts):
+        resume = _resume_picker("corr")
+        cc1, cc2, cc3 = st.columns(3)
+        with cc1:
+            min_score = st.number_input("Min score", 0.0, 100.0, 0.0, key="corr_min_score")
+        with cc2:
+            recommendation = st.text_input("Recommendations", value="", key="corr_rec")
+        with cc3:
+            top_n = st.number_input("Top N (0 = all)", 0, 100, 0, key="corr_top")
+
+        if st.button("Correlate", key="corr_run_btn"):
+            with st.spinner("Correlating artifacts..."):
+                result = cmd_correlate(
+                    out=str(out_dir / "correlation"),
+                    work_dir=str(work_dir),
+                    out_dir=str(out_dir),
+                    resume=resume if Path(resume).exists() else "",
+                    min_score=min_score if min_score > 0 else None,
+                    recommendation=recommendation,
+                    top=top_n if top_n > 0 else None,
+                )
+            _show_result(result)
+            if result.ok:
+                st.rerun()
+
+    if "correlation" not in artifacts:
+        st.info("No correlation data found. Run correlation above.")
+        return
+
     data = load_correlation(artifacts["correlation"])
 
     summary = data.get("summary", {})
@@ -494,6 +853,24 @@ def _page_correlation() -> None:
 
 def _page_analytics() -> None:
     st.header("Pipeline Analytics")
+
+    # ----- Regenerate action -----
+    with st.expander("Regenerate analytics"):
+        if st.button("Regenerate", key="analytics_regen_btn"):
+            with st.spinner("Generating analytics..."):
+                result = cmd_analytics(
+                    out_dir=str(work_dir),
+                    messages=str(artifacts.get("messages", "")),
+                    opportunities=str(artifacts.get("opportunities", "")),
+                )
+            _show_result(result)
+            if result.ok:
+                st.rerun()
+
+    if "analytics" not in artifacts:
+        st.info("No analytics data found. Run the pipeline or regenerate above.")
+        return
+
     analytics = load_analytics(artifacts["analytics"])
 
     if not analytics:
