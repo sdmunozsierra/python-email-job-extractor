@@ -2,18 +2,29 @@
 Streamlit web UI for the Email Opportunity Pipeline.
 
 Launch with:
-    streamlit run src/email_opportunity_pipeline/ui/app.py
-or via the justfile / CLI:
     email-pipeline ui
+    streamlit run src/email_opportunity_pipeline/ui/app.py
+    uv run streamlit run src/email_opportunity_pipeline/ui/app.py
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Ensure the package is importable when Streamlit runs this file as a script.
+# ``streamlit run .../app.py`` executes the file directly so Python does not
+# recognise the parent package and relative imports fail.  We add the project
+# ``src/`` directory to sys.path so absolute imports resolve correctly.
+# ---------------------------------------------------------------------------
+_src_dir = str(Path(__file__).resolve().parent.parent.parent)
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 import streamlit as st
 
-from .state import (
+from email_opportunity_pipeline.ui.state import (
     discover_artifacts,
     load_analytics,
     load_drafts,

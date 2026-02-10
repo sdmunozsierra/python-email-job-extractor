@@ -12,8 +12,7 @@ default:
 # Install the project and all extras (uv)
 install:
     uv venv
-    uv sync
-    uv pip install -e ".[llm,ui]"
+    uv sync --all-extras
 
 # Install using pip instead of uv
 install-pip:

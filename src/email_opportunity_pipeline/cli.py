@@ -1227,8 +1227,8 @@ def _cmd_ui(args: argparse.Namespace) -> None:
     except ImportError:
         print(
             "Streamlit is not installed.  Install the 'ui' extra:\n"
-            "  pip install -e '.[ui]'\n"
-            "  # or: uv pip install -e '.[ui]'"
+            "  uv sync --all-extras       # recommended (uv)\n"
+            "  pip install -e '.[ui]'     # or with pip"
         )
         return
 

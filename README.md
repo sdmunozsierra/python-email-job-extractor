@@ -136,11 +136,13 @@ docs/
 ```bash
 uv venv
 source .venv/bin/activate
-uv sync
+uv sync --all-extras
 ```
 
 `uv sync` automatically installs the vendor `resume-builder` package as an
-editable path dependency via `[tool.uv.sources]`.
+editable path dependency via `[tool.uv.sources]`.  The `--all-extras` flag
+also installs optional dependencies (OpenAI, Streamlit).  To install only
+the base dependencies use `uv sync` without the flag.
 
 ### Using pip
 
@@ -153,26 +155,18 @@ pip install -e vendor/resume-builder
 pip install -e .
 ```
 
-### Optional LLM support (OpenAI)
+### Optional extras (selective install)
+
+If you prefer to install extras individually instead of `--all-extras`:
 
 ```bash
-# uv
-uv pip install -e ".[llm]"
+# LLM support (OpenAI) -- required for analyze, match, compose
+uv sync --extra llm    # or: pip install -e ".[llm]"
 
-# pip
-pip install -e ".[llm]"
-```
+# Streamlit web dashboard
+uv sync --extra ui     # or: pip install -e ".[ui]"
 
-### Optional Streamlit UI
-
-```bash
-# uv
-uv pip install -e ".[ui]"
-
-# pip
-pip install -e ".[ui]"
-
-# Or install everything at once
+# Everything at once (pip)
 pip install -e ".[llm,ui]"
 ```
 
