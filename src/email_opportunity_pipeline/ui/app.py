@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Dict
 
 # ---------------------------------------------------------------------------
 # Ensure the package is importable when Streamlit runs this file as a script.
@@ -36,6 +37,10 @@ from email_opportunity_pipeline.ui.state import (
     load_tailoring_results,
     load_correlation,
     load_tracking,
+)
+from email_opportunity_pipeline.threading_utils import (
+    group_messages_by_thread,
+    build_thread_summaries,
 )
 from email_opportunity_pipeline.ui.runner import (
     RunResult,
@@ -87,6 +92,7 @@ else:
 # Build navigation -- always show all pages so users can trigger actions
 pages = [
     "Dashboard",
+    "Inbox",
     "Messages",
     "Opportunities",
     "Match Results",
@@ -243,6 +249,240 @@ def _page_dashboard() -> None:
             _show_result(result)
             if result.ok:
                 st.rerun()
+
+
+# ============================================================================
+# Inbox (Thread Viewer)
+# ============================================================================
+
+def _page_inbox() -> None:
+    st.header("Inbox")
+
+    if "messages" not in artifacts:
+        st.info("No messages found. Fetch emails from the **Messages** page first.")
+        return
+
+    # Load messages -- optionally switch between all fetched and filtered
+    source_options = ["All fetched"]
+    if "filtered" in artifacts:
+        source_options.append("Filtered only")
+
+    col_search, col_source = st.columns([3, 1])
+    with col_source:
+        show_source = st.selectbox("Source", source_options, key="inbox_source")
+    with col_search:
+        search_query = st.text_input(
+            "Search threads",
+            placeholder="Search by subject, sender, or content...",
+            key="inbox_search",
+        )
+
+    if show_source == "Filtered only" and "filtered" in artifacts:
+        messages = load_messages(artifacts["filtered"])
+    else:
+        messages = load_messages(artifacts["messages"])
+
+    if not messages:
+        st.info("No messages to display.")
+        return
+
+    # Build thread structure
+    threads = group_messages_by_thread(messages)
+    summaries = build_thread_summaries(threads)
+
+    # Load correlation data for pipeline status badges
+    correlation_lookup: Dict[str, dict] = {}  # message_id -> correlated opp
+    if "correlation" in artifacts:
+        corr_data = load_correlation(artifacts["correlation"])
+        for c in corr_data.get("correlated_opportunities", []):
+            for em in c.get("emails", []):
+                mid = em.get("message_id", "")
+                if mid:
+                    correlation_lookup[mid] = c
+            # Also index by job_id (which may be a message_id)
+            jid = c.get("job_id", "")
+            if jid:
+                correlation_lookup[jid] = c
+
+    # Apply search filter
+    if search_query:
+        q = search_query.lower()
+        summaries = [
+            s for s in summaries
+            if q in s.subject.lower()
+            or any(q in p.lower() for p in s.participants)
+            or q in s.earliest_snippet.lower()
+        ]
+
+    total_msgs = sum(s.message_count for s in summaries)
+    st.caption(f"{len(summaries)} thread(s)  \u00b7  {total_msgs} message(s)")
+
+    # Thread selection via session state
+    if "inbox_selected_thread" not in st.session_state:
+        st.session_state.inbox_selected_thread = None
+
+    selected_tid = st.session_state.inbox_selected_thread
+
+    if selected_tid and selected_tid in threads:
+        _render_thread_detail(threads[selected_tid], selected_tid, correlation_lookup)
+    else:
+        # Reset if thread no longer valid
+        if selected_tid is not None:
+            st.session_state.inbox_selected_thread = None
+        _render_thread_list(summaries, correlation_lookup)
+
+
+def _render_thread_list(
+    summaries: list,
+    correlation_lookup: dict,
+) -> None:
+    """Render the inbox thread list view."""
+    # Pagination
+    PAGE_SIZE = 25
+    total_pages = max(1, (len(summaries) + PAGE_SIZE - 1) // PAGE_SIZE)
+    if total_pages > 1:
+        page_num = st.number_input(
+            "Page", 1, total_pages, 1, key="inbox_page",
+        )
+    else:
+        page_num = 1
+
+    start = (page_num - 1) * PAGE_SIZE
+    page_summaries = summaries[start : start + PAGE_SIZE]
+
+    for i, summary in enumerate(page_summaries, start=start):
+        # Check pipeline status
+        badge = ""
+        for mid in summary.message_ids:
+            if mid in correlation_lookup:
+                opp = correlation_lookup[mid]
+                stage = opp.get("stage", "")
+                match_data = opp.get("match")
+                score_str = ""
+                if match_data and match_data.get("overall_score"):
+                    score_str = f" {match_data['overall_score']:.0f}/100"
+                badge = f"{stage}{score_str}"
+                break
+
+        # Thread row
+        col_subj, col_from, col_date = st.columns([5, 3, 2])
+        with col_subj:
+            count_prefix = f"({summary.message_count}) " if summary.message_count > 1 else ""
+            label = f"{count_prefix}{summary.subject[:70]}"
+            if badge:
+                label += f"  \u2014  `{badge}`"
+            if st.button(label, key=f"inbox_thread_{i}", use_container_width=True):
+                st.session_state.inbox_selected_thread = summary.thread_id
+                st.rerun()
+        with col_from:
+            display_from = summary.participants[0][:40] if summary.participants else ""
+            if len(summary.participants) > 1:
+                display_from += f" +{len(summary.participants) - 1}"
+            st.caption(display_from)
+        with col_date:
+            st.caption(summary.latest_date[:22] if summary.latest_date else "")
+
+
+def _render_thread_detail(
+    messages: list,
+    thread_id: str,
+    correlation_lookup: dict,
+) -> None:
+    """Render a full conversation thread."""
+    if st.button("\u2190 Back to Inbox", key="inbox_back"):
+        st.session_state.inbox_selected_thread = None
+        st.rerun()
+
+    # Thread header
+    first_msg = messages[0]
+    subject = (first_msg.get("headers") or {}).get("subject", "(no subject)")
+    st.subheader(subject)
+    st.caption(f"{len(messages)} message(s) in thread  \u00b7  Thread ID: `{thread_id[:20]}...`")
+
+    # Pipeline status banner
+    for msg in messages:
+        mid = msg.get("message_id", "")
+        if mid in correlation_lookup:
+            _render_pipeline_banner(correlation_lookup[mid])
+            break
+
+    st.markdown("---")
+
+    # Render each message (oldest first, latest expanded)
+    for i, msg in enumerate(messages):
+        _render_single_message(msg, expanded=(i == len(messages) - 1))
+
+
+def _render_pipeline_banner(opp: dict) -> None:
+    """Show a compact pipeline status banner for a correlated opportunity."""
+    cols = st.columns(5)
+    cols[0].markdown(f"**Stage:** {opp.get('stage', 'N/A')}")
+    cols[1].markdown(f"**Title:** {opp.get('job_title', 'N/A')}")
+    cols[2].markdown(f"**Company:** {opp.get('company', 'N/A')}")
+    match_data = opp.get("match")
+    if match_data:
+        cols[3].markdown(f"**Score:** {match_data.get('overall_score', 0):.0f}/100")
+        cols[4].markdown(f"**Grade:** {match_data.get('match_grade', 'N/A')}")
+
+
+def _render_single_message(msg: dict, *, expanded: bool = False) -> None:
+    """Render a single email message within a thread view."""
+    headers = msg.get("headers") or {}
+    sender = headers.get("from", "Unknown sender")
+    date = headers.get("date", "")
+
+    with st.expander(f"**{sender}** \u2014 {date}", expanded=expanded):
+        # Header details
+        hdr_col1, hdr_col2 = st.columns(2)
+        with hdr_col1:
+            st.markdown(f"**From:** {headers.get('from', '')}")
+            st.markdown(f"**To:** {headers.get('to', '')}")
+            if headers.get("cc"):
+                st.markdown(f"**Cc:** {headers['cc']}")
+        with hdr_col2:
+            st.markdown(f"**Date:** {date}")
+            st.markdown(f"**Subject:** {headers.get('subject', '')}")
+            if headers.get("in_reply_to"):
+                st.caption(f"In-Reply-To: {headers['in_reply_to']}")
+
+        # Labels
+        labels = msg.get("labels", [])
+        if labels:
+            st.markdown(f"**Labels:** {', '.join(labels)}")
+
+        st.markdown("---")
+
+        # Body
+        body = msg.get("body") or {}
+        body_text = body.get("text", "")
+        body_html = body.get("html", "")
+
+        if body_text:
+            st.text(body_text[:5000])
+        elif body_html:
+            st.markdown(body_html[:5000], unsafe_allow_html=True)
+        else:
+            snippet = msg.get("snippet", "")
+            st.caption(snippet if snippet else "(No body content)")
+
+        # HTML toggle
+        if body_text and body_html:
+            if st.checkbox("Show HTML version", key=f"html_{msg.get('message_id', '')}"):
+                st.markdown(body_html[:5000], unsafe_allow_html=True)
+
+        # Attachments
+        attachments = msg.get("attachments", [])
+        if attachments:
+            st.markdown(f"**Attachments ({len(attachments)}):**")
+            for att in attachments:
+                size_kb = att.get("size", 0) / 1024
+                fname = att.get("filename") or att.get("fileName", "unnamed")
+                mime = att.get("mimeType", "unknown")
+                st.caption(f"  {fname} ({mime}, {size_kb:.1f} KB)")
+
+        # Raw JSON
+        with st.expander("Raw message JSON"):
+            st.json(msg)
 
 
 # ============================================================================
@@ -1122,6 +1362,7 @@ def _page_analytics() -> None:
 
 _PAGE_MAP = {
     "Dashboard": _page_dashboard,
+    "Inbox": _page_inbox,
     "Messages": _page_messages,
     "Opportunities": _page_opportunities,
     "Match Results": _page_match_results,
