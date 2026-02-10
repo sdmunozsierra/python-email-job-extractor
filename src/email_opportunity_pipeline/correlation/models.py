@@ -28,6 +28,11 @@ class OpportunityStage(enum.Enum):
     TAILORED = "tailored"
     COMPOSED = "composed"
     REPLIED = "replied"
+    # Post-reply tracking stages
+    APPLIED = "applied"
+    INTERVIEWING = "interviewing"
+    OFFERED = "offered"
+    CLOSED = "closed"
 
 
 class ReplyOutcome(enum.Enum):

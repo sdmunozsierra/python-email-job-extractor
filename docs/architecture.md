@@ -10,6 +10,8 @@ At a high level, the pipeline is:
                               Analyze/Match ──> Tailor ──> Compose ──> Reply
                                                                         │
                                                                    Correlate
+                                                                        │
+                                                                     Track
 
   [  run-all  ──────────────────────────────────────────────────────────── ]
 ```
@@ -27,6 +29,7 @@ dry-run (default) or live send (`--send`) mode.
 8. **(Optional) Compose**: LLM composes personalised recruiter reply emails from match insights + questionnaire.
 9. **(Optional) Reply**: Send or dry-run composed emails, with tailored resumes attached.
 10. **(Optional) Correlate**: Build a unified view linking all artifacts per opportunity.
+11. **(Optional) Track**: Manage the post-reply application lifecycle (status, interviews, offers, outcomes).
 
 ## Key modules
 
@@ -39,6 +42,7 @@ dry-run (default) or live send (`--send`) mode.
 | Tailoring | `tailoring/` | Resume tailoring engine, adapter, change reporting |
 | Reply | `reply/` | Recruiter reply composer, sender, templates, reports |
 | Correlation | `correlation/` | Unified opportunity-email-resume correlation |
+| Tracking | `tracking/` | Post-reply application tracking (status, interviews, offers, outcomes) |
 | Schemas | `schemas/` | JSON schemas shipped with the package |
 | Pipeline | `pipeline.py` | Orchestration functions used by the CLI |
 | CLI | `cli.py` | `email-pipeline` command definitions |
@@ -409,6 +413,7 @@ Artifacts are JSON wrappers written by `io.py`:
 | Reply results | `reply_results: [ReplyResult.to_dict()]` | `write_reply_results()` | `read_reply_results()` |
 | Questionnaire | Direct dict | `write_questionnaire()` | `read_questionnaire()` |
 | Correlation | `correlated_opportunities: [...]` | `write_correlation()` | `read_correlation()` |
+| Tracking | `tracked_applications: [...]` | `write_tracking()` | `read_tracking()` |
 
 All wrappers include a `created_at_utc` (or `fetched_at_utc`) timestamp and a
 `count` field. This makes artifacts easy to version, archive, and re-run
@@ -444,6 +449,11 @@ email-pipeline correlate --> correlation/
                                correlation_summary.md
                                opportunity_cards/<job_id>.md
                                correlation_full_report.md
+email-pipeline track    --> output/tracking/
+                               tracking.json
+                               tracking_summary.md
+                               application_cards/<job_id>.md
+                               tracking_full_report.md
 ```
 
 ---
@@ -480,6 +490,7 @@ their data exists on disk.
 | Reply Drafts | drafts.json | Table, email preview with body |
 | Reply Results | reply_results.json | Status breakdown, send report |
 | Correlation | correlation.json | Stage bar chart, unified table |
+| Application Tracker | tracking.json | Status distribution, update forms, timeline |
 | Analytics | analytics.json | Metrics, domain/date charts, report |
 
 ### Launch

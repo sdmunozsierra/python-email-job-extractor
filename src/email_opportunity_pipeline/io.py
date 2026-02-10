@@ -364,3 +364,52 @@ def read_tailoring_results(path: str | Path) -> List[Dict[str, Any]]:
     """
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     return raw.get("tailoring_results", []) or []
+
+
+# =========================================================================
+# Tracking I/O
+# =========================================================================
+
+def write_tracking(
+    path: str | Path,
+    applications: List[Any],
+    summary: Any,
+) -> None:
+    """Write application tracking data to a JSON file.
+
+    Args:
+        path: Output path.
+        applications: List of TrackedApplication objects (or dicts).
+        summary: TrackingSummary object (or dict).
+    """
+    items = [
+        a.to_dict() if hasattr(a, "to_dict") else a for a in applications
+    ]
+    summary_dict = summary.to_dict() if hasattr(summary, "to_dict") else summary
+    payload = {
+        "created_at_utc": _utc_now_iso(),
+        "count": len(items),
+        "summary": summary_dict,
+        "tracked_applications": items,
+    }
+    Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def read_tracking(path: str | Path) -> Tuple[List[Any], Any]:
+    """Read application tracking data from a JSON file.
+
+    Args:
+        path: Path to the tracking JSON file.
+
+    Returns:
+        Tuple of (list of TrackedApplication, TrackingSummary).
+    """
+    from .tracking.models import TrackedApplication, TrackingSummary
+
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    items_data = raw.get("tracked_applications", []) or []
+    summary_data = raw.get("summary", {}) or {}
+
+    applications = [TrackedApplication.from_dict(d) for d in items_data]
+    summary = TrackingSummary.from_dict(summary_data)
+    return applications, summary

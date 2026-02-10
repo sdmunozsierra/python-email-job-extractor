@@ -36,6 +36,9 @@ built-in dry-run mode for safe e2e testing before going live.
 - **Opportunity Correlation**: Unified view linking every pipeline artifact
   (email, opportunity, match result, tailored resume, reply) per job -- see
   the complete lifecycle of each opportunity at a glance.
+- **Application Tracking**: Track the full hiring lifecycle beyond replies --
+  status updates, interview scheduling, offer recording, and final outcomes
+  (accepted, declined, rejected, withdrawn, ghosted) with a full audit trail.
 - **One-command e2e**: `run-all` executes the entire pipeline from fetch
   through reply in a single invocation, with a built-in dry-run mode.
 - **Streamlit Dashboard**: Interactive web UI for exploring pipeline
@@ -96,10 +99,16 @@ src/email_opportunity_pipeline/
     models.py              # CorrelatedOpportunity, CorrelationSummary
     correlator.py          # OpportunityCorrelator engine
     report.py              # Markdown correlation report renderer
+  tracking/                # Application Tracking (post-reply lifecycle)
+    __init__.py
+    models.py              # TrackedApplication, ApplicationStatus, OfferDetails
+    tracker.py             # ApplicationTracker engine
+    report.py              # Markdown tracking report renderer
   ui/                      # Streamlit Web Dashboard
     __init__.py
     app.py                 # Main Streamlit application
     state.py               # Artifact discovery and data loading helpers
+    runner.py              # Pipeline command wrappers for UI
   schemas/
     job_opportunity.schema.json
     resume.schema.json
@@ -584,6 +593,44 @@ Each opportunity is tracked through these pipeline stages:
 | Tailored | ✂️ | Resume tailored for job |
 | Composed | ✉️ | Reply email drafted |
 | Replied | ✅ | Reply sent (or dry-run) |
+| Applied | 📤 | Application sent, awaiting response |
+| Interviewing | 🗣️ | Interview process underway |
+| Offered | 💰 | Offer received |
+| Closed | 🏁 | Final outcome (accepted/declined/rejected/withdrawn/ghosted) |
+
+---
+
+## Application Tracking
+
+Once you've sent replies to recruiters, use the tracking commands to manage
+the rest of the hiring lifecycle:
+
+```bash
+# Initialise tracking from correlation data
+email-pipeline track --out-dir output --out output/tracking --full-report
+
+# Update an application's status
+email-pipeline track-update --tracking-file output/tracking/tracking.json \
+  --job-id <MSG_ID> --action status --status interviewing
+
+# Record an interview
+email-pipeline track-update --tracking-file output/tracking/tracking.json \
+  --job-id <MSG_ID> --action interview --interview-type technical \
+  --scheduled-at 2026-02-15
+
+# Record an offer
+email-pipeline track-update --tracking-file output/tracking/tracking.json \
+  --job-id <MSG_ID> --action offer --salary "150k USD"
+
+# Accept an offer
+email-pipeline track-update --tracking-file output/tracking/tracking.json \
+  --job-id <MSG_ID> --action outcome --outcome accepted
+```
+
+The tracker produces `tracking.json`, summary reports, and individual
+application cards. All status changes are recorded in a full audit trail.
+
+See `docs/cli.md` for the complete reference of `track` and `track-update`.
 
 ---
 
@@ -617,6 +664,7 @@ email-pipeline ui --port 8502
 | Reply Drafts | Preview composed reply emails with attachments |
 | Reply Results | Send status (sent, dry-run, failed) per email |
 | Correlation | Unified pipeline view linking all artifacts per opportunity |
+| Application Tracker | Track post-reply lifecycle: status, interviews, offers, outcomes |
 | Analytics | Filter metrics, domain analysis, score distribution, and insights |
 
 The dashboard auto-discovers artifacts from the `data/` and `output/`
