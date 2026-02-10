@@ -32,6 +32,7 @@ email-pipeline <command> --help
 | `compose` | Compose tailored recruiter reply emails | Optional |
 | `reply` | Send (or dry-run) composed reply emails | No |
 | `correlate` | Correlate opportunities with emails, resumes, and replies | No |
+| `ui` | Launch the Streamlit web dashboard | No |
 
 \* The `tailor` command does not call the LLM itself but requires match results
 produced by the `match` command (which does). The `resume-builder` vendor
@@ -727,6 +728,39 @@ email-pipeline correlate \
 - `correlation_summary.md` -- Overview report with score tables
 - `opportunity_cards/<job_id>.md` -- Individual cards (with `--individual-cards`)
 - `correlation_full_report.md` -- Single report with all cards (with `--full-report`)
+
+---
+
+## Streamlit Web Dashboard
+
+### `ui`
+
+Launch the interactive Streamlit dashboard to explore pipeline artifacts,
+match results, tailored resumes, and reply drafts in a web browser.
+
+Requires the `ui` extra: `pip install -e ".[ui]"`
+
+```bash
+# Default (port 8501)
+email-pipeline ui
+
+# Custom port
+email-pipeline ui --port 8502
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--port` | int | `8501` | Port for the Streamlit server |
+
+The dashboard auto-discovers artifacts from `data/` and `output/` directories
+(configurable in the sidebar). Pages appear in the navigation only when their
+corresponding data files exist on disk.
+
+You can also launch the app directly with Streamlit:
+
+```bash
+streamlit run src/email_opportunity_pipeline/ui/app.py
+```
 
 ---
 

@@ -1220,6 +1220,36 @@ def _print_reply_summary(results: list, dry_run: bool) -> None:
 # Job Opportunity Correlation Command
 # ============================================================================
 
+def _cmd_ui(args: argparse.Namespace) -> None:
+    """Launch the Streamlit web dashboard."""
+    try:
+        import streamlit.web.cli as stcli
+    except ImportError:
+        print(
+            "Streamlit is not installed.  Install the 'ui' extra:\n"
+            "  uv sync --all-extras       # recommended (uv)\n"
+            "  pip install -e '.[ui]'     # or with pip"
+        )
+        return
+
+    import sys
+    from pathlib import Path as _Path
+
+    app_path = str(
+        _Path(__file__).resolve().parent / "ui" / "app.py"
+    )
+
+    sys.argv = [
+        "streamlit",
+        "run",
+        app_path,
+        "--server.headless=true",
+        f"--server.port={args.port}",
+        "--",
+    ]
+    stcli.main()
+
+
 def _cmd_correlate(args: argparse.Namespace) -> None:
     """Correlate job opportunities with emails, resumes, and reply status.
 
@@ -1966,6 +1996,26 @@ def main() -> None:
     )
 
     correlate.set_defaults(func=_cmd_correlate)
+
+    # =========================================================================
+    # Streamlit UI Command
+    # =========================================================================
+
+    ui_parser = subparsers.add_parser(
+        "ui",
+        help="Launch the Streamlit web dashboard",
+        description=(
+            "Start the interactive Streamlit dashboard to explore pipeline\n"
+            "artifacts, match results, tailored resumes, and reply drafts.\n"
+            "\n"
+            "Requires the 'ui' extra:  pip install -e '.[ui]'\n"
+        ),
+    )
+    ui_parser.add_argument(
+        "--port", type=int, default=8501,
+        help="Port for the Streamlit server (default: 8501)"
+    )
+    ui_parser.set_defaults(func=_cmd_ui)
 
     args = parser.parse_args()
     args.func(args)
