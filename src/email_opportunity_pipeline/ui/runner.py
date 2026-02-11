@@ -280,3 +280,80 @@ def cmd_analytics(
     if opportunities:
         args += ["--opportunities", opportunities]
     return run_pipeline_command(args)
+
+
+# =========================================================================
+# Application Tracking
+# =========================================================================
+
+def cmd_track(
+    *,
+    out: str,
+    out_dir: str = "",
+    correlation: str = "",
+    tracking_file: str = "",
+    min_stage: str = "replied",
+    individual_cards: bool = True,
+    full_report: bool = True,
+) -> RunResult:
+    args = ["track", "--out", out]
+    if out_dir:
+        args += ["--out-dir", out_dir]
+    if correlation:
+        args += ["--correlation", correlation]
+    if tracking_file:
+        args += ["--tracking-file", tracking_file]
+    if min_stage != "replied":
+        args += ["--min-stage", min_stage]
+    if individual_cards:
+        args.append("--individual-cards")
+    if full_report:
+        args.append("--full-report")
+    return run_pipeline_command(args)
+
+
+def cmd_track_update(
+    *,
+    tracking_file: str,
+    job_id: str,
+    action: str,
+    status: str = "",
+    outcome: str = "",
+    note: str = "",
+    interview_type: str = "",
+    scheduled_at: str = "",
+    interviewer: str = "",
+    completed: bool = False,
+    salary: str = "",
+    equity: str = "",
+    bonus: str = "",
+    start_date: str = "",
+    out: str = "",
+) -> RunResult:
+    args = ["track-update", "--tracking-file", tracking_file,
+            "--job-id", job_id, "--action", action]
+    if status:
+        args += ["--status", status]
+    if outcome:
+        args += ["--outcome", outcome]
+    if note:
+        args += ["--note", note]
+    if interview_type:
+        args += ["--interview-type", interview_type]
+    if scheduled_at:
+        args += ["--scheduled-at", scheduled_at]
+    if interviewer:
+        args += ["--interviewer", interviewer]
+    if completed:
+        args.append("--completed")
+    if salary:
+        args += ["--salary", salary]
+    if equity:
+        args += ["--equity", equity]
+    if bonus:
+        args += ["--bonus", bonus]
+    if start_date:
+        args += ["--start-date", start_date]
+    if out:
+        args += ["--out", out]
+    return run_pipeline_command(args)

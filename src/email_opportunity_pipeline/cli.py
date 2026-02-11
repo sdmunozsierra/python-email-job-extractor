@@ -30,6 +30,9 @@ from .io import (
     write_reply_results,
     read_reply_results,
     write_correlation,
+    read_correlation,
+    write_tracking,
+    read_tracking,
 )
 from .pipeline import (
     build_filter_pipeline,
@@ -1217,6 +1220,274 @@ def _print_reply_summary(results: list, dry_run: bool) -> None:
 
 
 # ============================================================================
+# Application Tracking Commands
+# ============================================================================
+
+def _cmd_track(args: argparse.Namespace) -> None:
+    """Initialise application tracking from correlation data and/or display
+    the current tracking state."""
+    from .tracking import (
+        ApplicationTracker,
+        render_tracking_report,
+        render_application_card,
+    )
+
+    tracker = ApplicationTracker()
+
+    # Load existing tracking data (idempotent merge)
+    tracking_file = args.tracking_file
+    if not tracking_file:
+        out_path = Path(args.out)
+        candidate = out_path / "tracking.json"
+        if candidate.exists():
+            tracking_file = str(candidate)
+
+    if tracking_file and Path(tracking_file).exists():
+        existing_apps, _ = read_tracking(tracking_file)
+        tracker.load_existing(existing_apps)
+        print(f"Loaded {len(existing_apps)} existing tracked applications from {tracking_file}")
+
+    # Discover or use explicit correlation file
+    correlation_path = args.correlation
+    if not correlation_path:
+        out_dir = Path(args.out_dir) if args.out_dir else None
+        if out_dir and (out_dir / "correlation" / "correlation.json").exists():
+            correlation_path = str(out_dir / "correlation" / "correlation.json")
+
+    if correlation_path and Path(correlation_path).exists():
+        correlated, _ = read_correlation(correlation_path)
+        from .correlation.models import OpportunityStage
+
+        min_stage_str = args.min_stage or "replied"
+        try:
+            min_stage = OpportunityStage(min_stage_str)
+        except ValueError:
+            min_stage = OpportunityStage.REPLIED
+
+        new_count = tracker.init_from_correlation(correlated, min_stage=min_stage)
+        print(f"Initialised {new_count} new application(s) from correlation data")
+    else:
+        if not tracking_file:
+            print("No correlation data or existing tracking file found.")
+            print("Run 'correlate' first, or provide --correlation / --tracking-file.")
+            return
+
+    all_apps = tracker.get_all()
+    if not all_apps:
+        print("No applications to track.")
+        return
+
+    # Filter by status if requested
+    if args.status:
+        from .tracking.models import ApplicationStatus
+        statuses = set(args.status.split(","))
+        all_apps = [a for a in all_apps if a.status.value in statuses]
+        print(f"After status filter: {len(all_apps)} applications")
+
+    summary = tracker.build_summary()
+
+    # Output
+    out_path = Path(args.out)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # JSON
+    json_path = out_path / "tracking.json"
+    write_tracking(json_path, tracker.get_all(), summary)
+    print(f"\nTracking data saved to {json_path}")
+
+    # Summary report
+    summary_path = out_path / "tracking_summary.md"
+    summary_md = render_tracking_report(summary, all_apps, include_cards=False)
+    summary_path.write_text(summary_md, encoding="utf-8")
+    print(f"Summary report saved to {summary_path}")
+
+    # Individual cards
+    if args.individual_cards:
+        cards_dir = out_path / "application_cards"
+        cards_dir.mkdir(parents=True, exist_ok=True)
+        for app in all_apps:
+            card_md = render_application_card(app)
+            safe_id = app.job_id.replace("/", "_").replace("\\", "_")[:60]
+            card_path = cards_dir / f"{safe_id}.md"
+            card_path.write_text(card_md, encoding="utf-8")
+        print(f"Individual cards saved to {cards_dir}")
+
+    # Full report
+    if args.full_report:
+        full_path = out_path / "tracking_full_report.md"
+        full_md = render_tracking_report(summary, all_apps, include_cards=True)
+        full_path.write_text(full_md, encoding="utf-8")
+        print(f"Full report saved to {full_path}")
+
+    # Console summary
+    _print_tracking_summary(summary, all_apps)
+
+
+def _cmd_track_update(args: argparse.Namespace) -> None:
+    """Update status, notes, interviews, or offers for a tracked application."""
+    from .tracking import ApplicationTracker
+    from .tracking.models import (
+        ApplicationStatus,
+        FinalOutcome,
+        InterviewRecord,
+        InterviewType,
+        OfferDetails,
+    )
+    from .tracking.report import render_tracking_report
+
+    # Load existing tracking data
+    tracking_file = Path(args.tracking_file)
+    if not tracking_file.exists():
+        print(f"Error: tracking file not found: {tracking_file}")
+        return
+
+    existing_apps, _ = read_tracking(tracking_file)
+    tracker = ApplicationTracker()
+    tracker.load_existing(existing_apps)
+    print(f"Loaded {len(existing_apps)} tracked applications")
+
+    job_id = args.job_id
+    action = args.action
+
+    try:
+        if action == "status":
+            if not args.status:
+                print("Error: --status is required for action=status")
+                return
+            new_status = ApplicationStatus(args.status)
+            tracker.update_status(job_id, new_status, note=args.note)
+            print(f"Updated {job_id} -> {new_status.value}")
+
+        elif action == "outcome":
+            if not args.outcome:
+                print("Error: --outcome is required for action=outcome")
+                return
+            outcome = FinalOutcome(args.outcome)
+            tracker.set_outcome(job_id, outcome, note=args.note)
+            print(f"Set outcome for {job_id} -> {outcome.value}")
+
+        elif action == "interview":
+            interview_type_str = args.interview_type or "other"
+            try:
+                interview_type = InterviewType(interview_type_str)
+            except ValueError:
+                interview_type = InterviewType.OTHER
+
+            record = InterviewRecord(
+                interview_type=interview_type,
+                scheduled_at=args.scheduled_at,
+                completed=args.completed,
+                interviewer_name=args.interviewer,
+                notes=args.note,
+            )
+            tracker.add_interview(job_id, record)
+            print(f"Added interview for {job_id}: {interview_type.value}")
+
+        elif action == "offer":
+            offer = OfferDetails(
+                salary=args.salary,
+                equity=args.equity,
+                bonus=args.bonus,
+                start_date=args.start_date,
+                notes=args.note,
+            )
+            tracker.set_offer(job_id, offer)
+            print(f"Set offer for {job_id}")
+
+        elif action == "note":
+            if not args.note:
+                print("Error: --note is required for action=note")
+                return
+            tracker.add_note(job_id, args.note)
+            print(f"Added note to {job_id}")
+
+        else:
+            print(f"Error: unknown action '{action}'")
+            return
+
+    except KeyError as e:
+        print(f"Error: {e}")
+        return
+    except ValueError as e:
+        print(f"Error: invalid value: {e}")
+        return
+
+    # Write back
+    summary = tracker.build_summary()
+    out_dir = Path(args.out) if args.out else tracking_file.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    write_tracking(out_dir / "tracking.json", tracker.get_all(), summary)
+    print(f"Tracking data saved to {out_dir / 'tracking.json'}")
+
+    # Regenerate summary report
+    summary_md = render_tracking_report(summary, tracker.get_all(), include_cards=False)
+    (out_dir / "tracking_summary.md").write_text(summary_md, encoding="utf-8")
+    print(f"Summary report updated at {out_dir / 'tracking_summary.md'}")
+
+    # Show updated application
+    app = tracker.get_application(job_id)
+    if app:
+        print(f"\nUpdated: {app.job_title} at {app.company}")
+        print(f"  Status: {app.status.value}")
+        if app.final_outcome:
+            print(f"  Outcome: {app.final_outcome.value}")
+        print(f"  Interviews: {len(app.interviews)}")
+        print(f"  Offer: {'Yes' if app.offer else 'No'}")
+
+
+def _print_tracking_summary(
+    summary: "TrackingSummary",
+    applications: list,
+) -> None:
+    """Print a brief tracking summary to console."""
+    print()
+    print("=" * 64)
+    print("  APPLICATION TRACKING SUMMARY")
+    print("=" * 64)
+    print()
+
+    print(f"  Total Tracked:        {summary.total_tracked}")
+    print(f"  Active:               {summary.active_count}")
+    print(f"  Total Interviews:     {summary.total_interviews}")
+    print(f"  Offers Received:      {summary.offers_received}")
+
+    if summary.avg_match_score > 0:
+        print(f"  Avg Match Score:      {summary.avg_match_score:.1f}")
+
+    # Status breakdown
+    if summary.by_status:
+        print()
+        print("  By Status:")
+        for status in ["applied", "interviewing", "offered", "closed"]:
+            count = summary.by_status.get(status, 0)
+            if count:
+                print(f"    {status.title():16s} {count}")
+
+    # Outcome breakdown
+    if summary.by_outcome:
+        print()
+        print("  Outcomes:")
+        for outcome in ["accepted", "declined", "rejected", "withdrawn", "ghosted"]:
+            count = summary.by_outcome.get(outcome, 0)
+            if count:
+                print(f"    {outcome.title():16s} {count}")
+
+    # Top applications
+    active = [a for a in applications if a.is_active][:5]
+    if active:
+        print()
+        print("  Active Applications:")
+        for i, a in enumerate(active, 1):
+            score = f"{a.match_score:.0f}" if a.match_score is not None else "--"
+            company = a.company[:25] if a.company else "Unknown"
+            title = a.job_title[:30] if a.job_title else "Unknown"
+            print(f"    {i}. [{score}] {a.status.value.title():14s} {title} at {company}")
+
+    print()
+
+
+# ============================================================================
 # Job Opportunity Correlation Command
 # ============================================================================
 
@@ -1996,6 +2267,180 @@ def main() -> None:
     )
 
     correlate.set_defaults(func=_cmd_correlate)
+
+    # =========================================================================
+    # Application Tracking Commands
+    # =========================================================================
+
+    track = subparsers.add_parser(
+        "track",
+        help="Initialise and view application tracking from correlation data",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Bootstrap application tracking from correlation data and/or view\n"
+            "the current tracking state.  Produces a tracking.json file and\n"
+            "Markdown reports.\n"
+            "\n"
+            "Auto-discovery mode (simplest):\n"
+            "  email-pipeline track --out-dir output --out output/tracking\n"
+            "\n"
+            "Explicit paths:\n"
+            "  email-pipeline track \\\n"
+            "    --correlation output/correlation/correlation.json \\\n"
+            "    --out output/tracking --full-report --individual-cards\n"
+        ),
+    )
+
+    # -- Auto-discovery paths --
+    track_auto = track.add_argument_group(
+        "auto-discovery",
+        "When provided, the correlation file is discovered automatically "
+        "from the output directory."
+    )
+    track_auto.add_argument(
+        "--out-dir",
+        help="Output directory (contains correlation/ from a prior correlate run)"
+    )
+
+    # -- Explicit paths --
+    track_input = track.add_argument_group("explicit artifact paths")
+    track_input.add_argument(
+        "--correlation",
+        help="Path to correlation.json (from 'correlate' command)"
+    )
+    track_input.add_argument(
+        "--tracking-file",
+        help="Path to existing tracking.json to merge with (for idempotent re-runs)"
+    )
+
+    # -- Filtering --
+    track_filter = track.add_argument_group("filtering")
+    track_filter.add_argument(
+        "--min-stage", default="replied",
+        help="Minimum pipeline stage for initialisation (default: replied)"
+    )
+    track_filter.add_argument(
+        "--status",
+        help="Comma-separated statuses to display (e.g. applied,interviewing)"
+    )
+
+    # -- Output --
+    track_output = track.add_argument_group("output")
+    track_output.add_argument(
+        "--out", required=True,
+        help="Output directory for tracking results"
+    )
+    track_output.add_argument(
+        "--individual-cards", action="store_true",
+        help="Generate individual Markdown cards per application"
+    )
+    track_output.add_argument(
+        "--full-report", action="store_true",
+        help="Generate a single comprehensive report with all cards included"
+    )
+
+    track.set_defaults(func=_cmd_track)
+
+    # -- track-update command --
+    track_update = subparsers.add_parser(
+        "track-update",
+        help="Update status, notes, interviews, or offers for a tracked application",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Modify a specific tracked application.  Requires an existing\n"
+            "tracking.json file (from the 'track' command).\n"
+            "\n"
+            "Examples:\n"
+            "  # Update status\n"
+            "  email-pipeline track-update \\\n"
+            "    --tracking-file output/tracking/tracking.json \\\n"
+            "    --job-id MSG_ID --action status --status interviewing\n"
+            "\n"
+            "  # Record an interview\n"
+            "  email-pipeline track-update \\\n"
+            "    --tracking-file output/tracking/tracking.json \\\n"
+            "    --job-id MSG_ID --action interview \\\n"
+            "    --interview-type technical --scheduled-at 2026-02-15\n"
+            "\n"
+            "  # Record an offer\n"
+            "  email-pipeline track-update \\\n"
+            "    --tracking-file output/tracking/tracking.json \\\n"
+            "    --job-id MSG_ID --action offer --salary '150k USD'\n"
+            "\n"
+            "  # Accept an offer\n"
+            "  email-pipeline track-update \\\n"
+            "    --tracking-file output/tracking/tracking.json \\\n"
+            "    --job-id MSG_ID --action outcome --outcome accepted\n"
+        ),
+    )
+
+    track_update.add_argument(
+        "--tracking-file", required=True,
+        help="Path to tracking.json"
+    )
+    track_update.add_argument(
+        "--job-id", required=True,
+        help="Job ID of the application to update"
+    )
+    track_update.add_argument(
+        "--action", required=True,
+        choices=["status", "outcome", "interview", "offer", "note"],
+        help="Type of update to perform"
+    )
+    track_update.add_argument(
+        "--status",
+        choices=["applied", "interviewing", "offered", "closed"],
+        help="New application status (for action=status)"
+    )
+    track_update.add_argument(
+        "--outcome",
+        choices=["accepted", "declined", "rejected", "withdrawn", "ghosted"],
+        help="Final outcome (for action=outcome)"
+    )
+    track_update.add_argument(
+        "--interview-type",
+        choices=["phone_screen", "technical", "behavioral", "system_design",
+                 "hiring_manager", "panel", "onsite", "other"],
+        help="Interview type (for action=interview)"
+    )
+    track_update.add_argument(
+        "--scheduled-at",
+        help="Interview date/time (for action=interview)"
+    )
+    track_update.add_argument(
+        "--interviewer",
+        help="Interviewer name (for action=interview)"
+    )
+    track_update.add_argument(
+        "--completed", action="store_true",
+        help="Mark interview as completed (for action=interview)"
+    )
+    track_update.add_argument(
+        "--salary",
+        help="Offer salary (for action=offer)"
+    )
+    track_update.add_argument(
+        "--equity",
+        help="Offer equity (for action=offer)"
+    )
+    track_update.add_argument(
+        "--bonus",
+        help="Offer bonus (for action=offer)"
+    )
+    track_update.add_argument(
+        "--start-date",
+        help="Offer start date (for action=offer)"
+    )
+    track_update.add_argument(
+        "--note",
+        help="Free-form note (used by all actions)"
+    )
+    track_update.add_argument(
+        "--out",
+        help="Output directory (default: same as tracking file directory)"
+    )
+
+    track_update.set_defaults(func=_cmd_track_update)
 
     # =========================================================================
     # Streamlit UI Command

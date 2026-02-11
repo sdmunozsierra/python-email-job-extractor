@@ -30,6 +30,11 @@ _STAGE_ICON = {
     OpportunityStage.TAILORED: "✂️",
     OpportunityStage.COMPOSED: "✉️",
     OpportunityStage.REPLIED: "✅",
+    # Post-reply tracking stages
+    OpportunityStage.APPLIED: "📤",
+    OpportunityStage.INTERVIEWING: "🗣️",
+    OpportunityStage.OFFERED: "💰",
+    OpportunityStage.CLOSED: "🏁",
 }
 
 _REPLY_ICON = {
@@ -154,6 +159,7 @@ def render_correlation_summary(
         stage_order = [
             "fetched", "filtered", "extracted", "analyzed",
             "matched", "tailored", "composed", "replied",
+            "applied", "interviewing", "offered", "closed",
         ]
         for stage_name in stage_order:
             count = summary.by_stage.get(stage_name, 0)

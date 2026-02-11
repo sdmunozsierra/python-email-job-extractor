@@ -14,6 +14,8 @@ class EmailHeaders:
     date: str = ""
     subject: str = ""
     message_id: str = ""
+    in_reply_to: str = ""
+    references: str = ""
 
     def to_dict(self) -> Dict[str, str]:
         return {
@@ -24,6 +26,8 @@ class EmailHeaders:
             "date": self.date,
             "subject": self.subject,
             "message_id_header": self.message_id,
+            "in_reply_to": self.in_reply_to,
+            "references": self.references,
         }
 
     @classmethod
@@ -36,6 +40,8 @@ class EmailHeaders:
             date=data.get("date", ""),
             subject=data.get("subject", ""),
             message_id=data.get("message_id_header", ""),
+            in_reply_to=data.get("in_reply_to", ""),
+            references=data.get("references", ""),
         )
 
 

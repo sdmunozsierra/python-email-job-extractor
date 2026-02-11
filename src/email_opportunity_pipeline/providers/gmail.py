@@ -96,7 +96,7 @@ class GmailProvider(EmailProvider):
                     userId=self.user_id,
                     id=msg_id,
                     format=fmt,
-                    metadataHeaders=["From", "To", "Cc", "Bcc", "Date", "Subject", "Message-Id"],
+                    metadataHeaders=["From", "To", "Cc", "Bcc", "Date", "Subject", "Message-Id", "In-Reply-To", "References"],
                 )
                 .execute()
             )
@@ -117,6 +117,8 @@ class GmailProvider(EmailProvider):
                     date=get_header(headers, "Date"),
                     subject=get_header(headers, "Subject"),
                     message_id=get_header(headers, "Message-Id"),
+                    in_reply_to=get_header(headers, "In-Reply-To"),
+                    references=get_header(headers, "References"),
                 ),
                 snippet=msg.get("snippet", ""),
                 body_text=body_info.get("text", ""),

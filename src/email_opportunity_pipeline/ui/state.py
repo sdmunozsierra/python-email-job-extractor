@@ -75,6 +75,14 @@ def load_correlation(path: Path) -> Dict[str, Any]:
     return data
 
 
+def load_tracking(path: Path) -> Dict[str, Any]:
+    """Load application tracking data."""
+    data = _read_json(path)
+    if data is None:
+        return {}
+    return data
+
+
 def discover_artifacts(work_dir: Path, out_dir: Path) -> Dict[str, Path]:
     """Discover available pipeline artifacts from standard directory layout.
 
@@ -98,5 +106,7 @@ def discover_artifacts(work_dir: Path, out_dir: Path) -> Dict[str, Path]:
         "reply_report": out_dir / "replies" / "reply_report.md",
         "correlation": out_dir / "correlation" / "correlation.json",
         "correlation_summary": out_dir / "correlation" / "correlation_summary.md",
+        "tracking": out_dir / "tracking" / "tracking.json",
+        "tracking_summary": out_dir / "tracking" / "tracking_summary.md",
     }
     return {name: path for name, path in candidates.items() if path.exists()}

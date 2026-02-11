@@ -32,6 +32,8 @@ email-pipeline <command> --help
 | `compose` | Compose tailored recruiter reply emails | Optional |
 | `reply` | Send (or dry-run) composed reply emails | No |
 | `correlate` | Correlate opportunities with emails, resumes, and replies | No |
+| `track` | Initialise and view application tracking from correlation data | No |
+| `track-update` | Update status, notes, interviews, or offers for a tracked application | No |
 | `ui` | Launch the Streamlit web dashboard | No |
 
 \* The `tailor` command does not call the LLM itself but requires match results
@@ -764,6 +766,146 @@ streamlit run src/email_opportunity_pipeline/ui/app.py
 
 ---
 
+## Application Tracking
+
+### `track`
+
+Initialise application tracking from correlation data and view the current
+tracking state. Produces a `tracking.json` file and Markdown reports.
+
+**Auto-discovery mode (simplest):**
+
+```bash
+email-pipeline track --out-dir output --out output/tracking --full-report
+```
+
+**Explicit paths:**
+
+```bash
+email-pipeline track \
+  --correlation output/correlation/correlation.json \
+  --out output/tracking \
+  --full-report --individual-cards
+```
+
+**Merge with existing tracking data:**
+
+```bash
+email-pipeline track \
+  --tracking-file output/tracking/tracking.json \
+  --correlation output/correlation/correlation.json \
+  --out output/tracking
+```
+
+#### Options
+
+**Auto-discovery:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--out-dir` | path | -- | Output directory (discovers correlation/ automatically) |
+
+**Explicit artifact paths:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--correlation` | path | -- | Path to correlation.json |
+| `--tracking-file` | path | -- | Existing tracking.json to merge with |
+
+**Filtering:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--min-stage` | string | `replied` | Minimum pipeline stage for initialisation |
+| `--status` | string | -- | Comma-separated statuses to display (e.g. `applied,interviewing`) |
+
+**Output:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--out` | path | **required** | Output directory for tracking results |
+| `--individual-cards` | flag | off | Generate per-application Markdown cards |
+| `--full-report` | flag | off | Generate single comprehensive report with all cards |
+
+**Outputs:**
+- `tracking.json` -- All tracked applications with status history
+- `tracking_summary.md` -- Overview report with status distribution
+- `application_cards/<job_id>.md` -- Individual cards (with `--individual-cards`)
+- `tracking_full_report.md` -- Single report with all cards (with `--full-report`)
+
+---
+
+### `track-update`
+
+Update the status, notes, interviews, or offers for a specific tracked
+application. Requires an existing `tracking.json` file from the `track` command.
+
+**Update status:**
+
+```bash
+email-pipeline track-update \
+  --tracking-file output/tracking/tracking.json \
+  --job-id MSG_ID --action status --status interviewing \
+  --note "Phone screen scheduled for next week"
+```
+
+**Record an interview:**
+
+```bash
+email-pipeline track-update \
+  --tracking-file output/tracking/tracking.json \
+  --job-id MSG_ID --action interview \
+  --interview-type technical --scheduled-at 2026-02-15 \
+  --interviewer "Jane Smith" --note "System design focus"
+```
+
+**Record an offer:**
+
+```bash
+email-pipeline track-update \
+  --tracking-file output/tracking/tracking.json \
+  --job-id MSG_ID --action offer \
+  --salary "150k USD" --equity "0.1%" --start-date 2026-03-01
+```
+
+**Accept an offer:**
+
+```bash
+email-pipeline track-update \
+  --tracking-file output/tracking/tracking.json \
+  --job-id MSG_ID --action outcome --outcome accepted
+```
+
+**Add a note:**
+
+```bash
+email-pipeline track-update \
+  --tracking-file output/tracking/tracking.json \
+  --job-id MSG_ID --action note --note "Recruiter mentioned team expansion"
+```
+
+#### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--tracking-file` | path | **required** | Path to tracking.json |
+| `--job-id` | string | **required** | Job ID of the application to update |
+| `--action` | choice | **required** | `status`, `outcome`, `interview`, `offer`, or `note` |
+| `--status` | choice | -- | New status: `applied`, `interviewing`, `offered`, `closed` |
+| `--outcome` | choice | -- | Final outcome: `accepted`, `declined`, `rejected`, `withdrawn`, `ghosted` |
+| `--interview-type` | choice | `other` | `phone_screen`, `technical`, `behavioral`, `system_design`, `hiring_manager`, `panel`, `onsite`, `other` |
+| `--scheduled-at` | string | -- | Interview date/time |
+| `--interviewer` | string | -- | Interviewer name |
+| `--completed` | flag | off | Mark interview as completed |
+| `--salary` | string | -- | Offer salary |
+| `--equity` | string | -- | Offer equity |
+| `--bonus` | string | -- | Offer bonus |
+| `--start-date` | string | -- | Offer start date |
+| `--note` | string | -- | Free-form note (used by all actions) |
+| `--out` | path | -- | Output directory (default: same as tracking file directory) |
+
+---
+
 ## End-to-end workflow
 
 ### One command (recommended)
@@ -865,4 +1007,12 @@ email-pipeline correlate \
   --resume examples/sample_resume.json \
   --out correlation \
   --individual-cards --full-report
+
+# 13. Initialise application tracking
+email-pipeline track --out-dir output --out output/tracking --full-report
+
+# 14. Update applications as the hiring process progresses
+email-pipeline track-update \
+  --tracking-file output/tracking/tracking.json \
+  --job-id MSG_ID --action status --status interviewing
 ```

@@ -92,6 +92,14 @@ reply *ARGS:
 correlate *ARGS:
     email-pipeline correlate {{ARGS}}
 
+# Initialise application tracking
+track *ARGS:
+    email-pipeline track {{ARGS}}
+
+# Update a tracked application
+track-update *ARGS:
+    email-pipeline track-update {{ARGS}}
+
 # Generate analytics
 analytics *ARGS:
     email-pipeline analytics {{ARGS}}
@@ -133,6 +141,13 @@ quickstart-correlate:
     email-pipeline correlate \
         --work-dir data --out-dir output \
         --out output/correlation \
+        --full-report --individual-cards
+
+# Initialise tracking after correlation
+quickstart-track:
+    email-pipeline track \
+        --out-dir output \
+        --out output/tracking \
         --full-report --individual-cards
 
 # ---------------------------------------------------------------------------
