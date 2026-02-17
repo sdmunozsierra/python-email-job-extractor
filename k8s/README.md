@@ -1,6 +1,6 @@
 # Kubernetes Deployment
 
-Deploy the Email Opportunity Pipeline to a Kubernetes cluster.
+Deploy the Email Opportunity Pipeline to a Kubernetes cluster using **ArgoCD** for GitOps-based continuous delivery.
 
 ## Architecture
 
@@ -9,6 +9,7 @@ Deploy the Email Opportunity Pipeline to a Kubernetes cluster.
 | **Deployment** | Streamlit UI dashboard (1 replica) |
 | **CronJob** | Scheduled `run-all` pipeline execution (every 6h) |
 | **Service** | ClusterIP exposing the UI on port 80 |
+| **Ingress** | Internal hostname routing to the Streamlit UI |
 | **PVCs** | Persistent storage for `data/`, `output/`, and `resumes/` |
 | **Secret** | OpenAI API key + Gmail OAuth credentials |
 | **ConfigMap** | Filter rules and questionnaire configuration |
@@ -80,14 +81,27 @@ kubectl apply -k k8s/
 
 ## Accessing the UI
 
-Port-forward to access the Streamlit dashboard locally:
+### Via Ingress (recommended for internal networks)
+
+The Ingress resource routes traffic from your internal DNS to the Streamlit dashboard. After deploying, configure your internal DNS to point `email-pipeline.internal` at your ingress controller's load balancer IP.
+
+Then open: `http://email-pipeline.internal`
+
+To customize the hostname, edit `k8s/ingress.yaml`:
+
+```yaml
+rules:
+  - host: my-custom-hostname.corp.internal
+```
+
+The Ingress is configured for `nginx-internal` ingress class. Adjust `ingressClassName` and the annotation `kubernetes.io/ingress.class` to match your cluster's internal ingress controller.
+
+### Via port-forward (local development)
 
 ```bash
 kubectl -n email-pipeline port-forward svc/email-pipeline-ui 8502:80
 # Open http://localhost:8502
 ```
-
-For external access, add an Ingress resource pointing to the `email-pipeline-ui` service.
 
 ## Running the pipeline manually
 
@@ -114,3 +128,86 @@ schedule: "0 9 * * 1-5"   # Weekdays at 9am
 | `pipeline-data` | `/app/data` | JSON artifacts (messages, filtered, opportunities, analyses) |
 | `pipeline-output` | `/app/output` | Reports, matches, tailored resumes, reply drafts |
 | `pipeline-resumes` | `/app/resumes` | Your resume file(s) |
+
+---
+
+## ArgoCD Deployment (GitOps)
+
+The `argocd/` directory contains manifests for deploying through ArgoCD, providing automated sync from this Git repository to your cluster.
+
+### Prerequisites
+
+1. ArgoCD installed on your cluster ([install guide](https://argo-cd.readthedocs.io/en/stable/getting_started/))
+2. This repository accessible from the cluster (HTTPS or SSH)
+3. Secrets and ConfigMap values populated (see steps 2–3 above)
+
+### ArgoCD resources
+
+| File | Kind | Purpose |
+|------|------|---------|
+| `argocd/project.yaml` | `AppProject` | Scoped project restricting allowed repos, namespaces, and resource types |
+| `argocd/application.yaml` | `Application` | Points ArgoCD at the `k8s/` directory and defines sync policy |
+
+### Setup
+
+#### 1. Configure the repository URL
+
+Edit both `argocd/project.yaml` and `argocd/application.yaml` and set `repoURL` / `sourceRepos` to your actual Git repository URL.
+
+#### 2. Set the container image
+
+In `argocd/application.yaml`, replace the image override under `spec.source.kustomize.images`:
+
+```yaml
+kustomize:
+  images:
+    - email-pipeline=myregistry.corp.internal/email-pipeline:latest
+```
+
+#### 3. Set the Ingress hostname
+
+Edit `k8s/ingress.yaml` and replace `email-pipeline.internal` with your internal DNS hostname. Adjust `ingressClassName` to match your cluster's internal ingress controller.
+
+#### 4. Apply the ArgoCD resources
+
+```bash
+kubectl apply -f argocd/project.yaml
+kubectl apply -f argocd/application.yaml
+```
+
+ArgoCD will detect the `k8s/` directory and automatically sync all resources to the `email-pipeline` namespace.
+
+### Sync policy
+
+The Application is configured with:
+
+- **Automated sync** — changes pushed to the `main` branch are deployed automatically
+- **Self-heal** — manual cluster drift is reverted to match Git
+- **Prune** — resources removed from Git are deleted from the cluster
+- **Retry** — failed syncs retry up to 3 times with exponential backoff
+
+### Monitoring
+
+```bash
+# Check application status via ArgoCD CLI
+argocd app get email-pipeline
+
+# View sync history
+argocd app history email-pipeline
+
+# Trigger a manual sync
+argocd app sync email-pipeline
+
+# Open the ArgoCD web UI
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+# Open https://localhost:8080
+```
+
+### GitOps workflow
+
+Once ArgoCD is set up, the deployment workflow becomes:
+
+1. Make changes to manifests in `k8s/` or application code
+2. Build and push a new container image with an updated tag
+3. Update the image tag in `argocd/application.yaml` (or use ArgoCD Image Updater)
+4. Push to `main` — ArgoCD detects the change and syncs automatically
