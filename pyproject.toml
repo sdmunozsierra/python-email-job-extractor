@@ -1,6 +1,6 @@
 [project]
 name = "email-opportunity-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fetch, filter, and normalize email job opportunities."
 readme = "README.md"
 requires-python = ">=3.11"

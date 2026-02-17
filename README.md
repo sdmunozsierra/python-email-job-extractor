@@ -11,6 +11,7 @@ built-in dry-run mode for safe e2e testing before going live.
 - `docs/configuration.md`: environment variables, file formats, rules, and windows
 - `docs/architecture.md`: pipeline stages, interfaces, vendor integration, and extension points
 - `docs/troubleshooting.md`: common setup/runtime issues
+- `k8s/README.md`: Kubernetes deployment guide
 - `CONTRIBUTING.md`: development setup and contribution guidelines
 
 ## Why this exists
@@ -45,10 +46,24 @@ built-in dry-run mode for safe e2e testing before going live.
   artifacts, match results, tailored resumes, and reply drafts.
 - **Justfile**: Task runner shortcuts for common development and pipeline
   commands (requires [just](https://github.com/casey/just)).
+- **Docker + Kubernetes**: Containerized deployment with a CronJob for
+  scheduled pipeline runs and a Deployment for the Streamlit dashboard.
 
 ## Project layout
 
 ```
+Dockerfile                       # Container image definition
+.dockerignore                    # Files excluded from Docker build
+k8s/                             # Kubernetes deployment manifests
+  namespace.yaml                 # Dedicated namespace
+  secrets.yaml                   # API keys and Gmail OAuth credentials
+  configmap.yaml                 # Filter rules and questionnaire config
+  pvc.yaml                       # Persistent volumes for data, output, resumes
+  deployment.yaml                # Streamlit UI deployment
+  service.yaml                   # ClusterIP service for the UI
+  cronjob.yaml                   # Scheduled pipeline runs
+  kustomization.yaml             # Kustomize orchestration
+  README.md                      # Deployment guide
 src/email_opportunity_pipeline/
   __init__.py              # Package root with version
   cli.py                   # email-pipeline CLI entry point
@@ -722,6 +737,62 @@ git fetch resume-builder
 git subtree pull --prefix=vendor/resume-builder resume-builder main --squash
 uv sync   # or: pip install -e vendor/resume-builder
 ```
+
+---
+
+## Docker
+
+Build and run the pipeline as a container:
+
+```bash
+# Build the image
+docker build -t email-pipeline:latest .
+
+# Run a pipeline command
+docker run --rm \
+  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/output:/app/output" \
+  -v "$PWD/credentials.json:/app/secrets/gmail/credentials.json:ro" \
+  -v "$PWD/token.json:/app/secrets/gmail/token.json:ro" \
+  -v "$PWD/examples/sample_resume.json:/app/resumes/resume.json:ro" \
+  email-pipeline:latest run-all \
+    --resume /app/resumes/resume.json \
+    --provider gmail --window 2d \
+    --work-dir /app/data --out-dir /app/output
+
+# Launch the Streamlit dashboard
+docker run --rm -p 8502:8502 \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/output:/app/output" \
+  email-pipeline:latest ui --port 8502
+```
+
+## Kubernetes Deployment
+
+The `k8s/` directory contains a full set of manifests for deploying to a
+Kubernetes cluster using Kustomize:
+
+- **Deployment** -- Streamlit UI dashboard
+- **CronJob** -- Scheduled `run-all` pipeline execution (every 6h)
+- **Service** -- ClusterIP exposing the UI on port 80
+- **PVCs** -- Persistent storage for data, output, and resume files
+- **Secret** -- OpenAI API key and Gmail OAuth credentials
+- **ConfigMap** -- Filter rules and questionnaire configuration
+
+```bash
+# Deploy everything
+kubectl apply -k k8s/
+
+# Port-forward to access the UI locally
+kubectl -n email-pipeline port-forward svc/email-pipeline-ui 8502:80
+
+# Trigger a manual pipeline run
+kubectl -n email-pipeline create job --from=cronjob/email-pipeline-run manual-run
+```
+
+See `k8s/README.md` for the full setup guide including secrets configuration,
+resume upload, and image registry setup.
 
 ---
 
