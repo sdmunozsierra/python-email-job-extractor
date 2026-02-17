@@ -179,6 +179,82 @@ message ID, e.g. `out/<message_id>.md`.
 
 ---
 
+## Docker
+
+The `Dockerfile` at the project root builds an image with all dependencies
+pre-installed. Key paths inside the container:
+
+| Container path | Purpose |
+|---------------|---------|
+| `/app/data` | Pipeline JSON artifacts (`--work-dir`) |
+| `/app/output` | Reports, tailored resumes, replies (`--out-dir`) |
+| `/app/resumes` | Resume input files |
+| `/app/config` | ConfigMap-mounted filter rules and questionnaire |
+| `/app/secrets/gmail/` | Gmail OAuth credentials (mounted from Secret) |
+
+### Environment variables in Docker/K8s
+
+When running in a container, all the same environment variables apply.
+In Kubernetes they are supplied via Secrets and ConfigMaps:
+
+| Variable | K8s source | Manifest |
+|----------|-----------|----------|
+| `OPENAI_API_KEY` | `Secret/email-pipeline-secrets` | `k8s/secrets.yaml` |
+| `GMAIL_CREDENTIALS_PATH` | Set to `/app/secrets/gmail/credentials.json` | `k8s/deployment.yaml` |
+| `GMAIL_TOKEN_PATH` | Set to `/app/secrets/gmail/token.json` | `k8s/deployment.yaml` |
+
+The Gmail OAuth files are stored as `Secret/gmail-credentials` and mounted as
+files rather than environment variables, since the application reads them by
+path.
+
+---
+
+## Kubernetes configuration
+
+### Secrets (`k8s/secrets.yaml`)
+
+Two secrets:
+
+1. **`email-pipeline-secrets`** -- `OPENAI_API_KEY` as a string
+2. **`gmail-credentials`** -- `credentials.json` and `token.json` file contents
+
+Replace the placeholder values before deploying. For production, use
+`kubectl create secret` or a secrets manager (Sealed Secrets, External Secrets
+Operator) instead of committing secrets.
+
+### ConfigMap (`k8s/configmap.yaml`)
+
+Holds `filter_rules.json` and `questionnaire.json`. Edit the ConfigMap to
+customise pipeline behaviour without rebuilding the image.
+
+### Persistent volumes (`k8s/pvc.yaml`)
+
+| PVC | Size | Mount path | Purpose |
+|-----|------|-----------|---------|
+| `pipeline-data` | 1Gi | `/app/data` | JSON artifacts |
+| `pipeline-output` | 2Gi | `/app/output` | Reports, resumes, replies |
+| `pipeline-resumes` | 500Mi | `/app/resumes` | Resume input files |
+
+All volumes use `ReadWriteOnce` access mode and are shared between the
+Deployment (UI) and CronJob (pipeline).
+
+### CronJob schedule (`k8s/cronjob.yaml`)
+
+Default: every 6 hours (`0 */6 * * *`). Edit the `schedule` field to change.
+
+### Image reference (`k8s/kustomization.yaml`)
+
+Set `newName` to your container registry path:
+
+```yaml
+images:
+  - name: email-pipeline
+    newName: <your-registry>/email-pipeline
+    newTag: latest
+```
+
+---
+
 ## Vendor: resume-builder
 
 The `vendor/resume-builder/` directory is a git subtree of the

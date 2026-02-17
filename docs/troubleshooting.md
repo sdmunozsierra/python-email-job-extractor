@@ -188,6 +188,55 @@ tailoring suggestions. This can happen if:
 
 ---
 
+## Docker / Kubernetes issues
+
+### `docker build` fails with pip errors
+
+Make sure the `.dockerignore` is present and excludes `.venv`, `__pycache__`,
+and other local artifacts. If you see network errors during `pip install`,
+check your Docker network configuration or proxy settings.
+
+### Container cannot authenticate with Gmail
+
+The Gmail OAuth flow requires a browser. You **must** complete the OAuth flow
+locally first to generate `token.json`, then supply it to the container via a
+Secret or volume mount:
+
+```bash
+# Run locally once to generate token.json
+email-pipeline fetch --provider gmail --window 1h --out /dev/null
+
+# Then mount the token into the container
+docker run --rm \
+  -v "$PWD/token.json:/app/secrets/gmail/token.json:ro" \
+  -v "$PWD/credentials.json:/app/secrets/gmail/credentials.json:ro" \
+  email-pipeline:latest fetch --provider gmail --window 1h --out /app/data/test.json
+```
+
+In Kubernetes, store both files in the `gmail-credentials` Secret.
+
+### CronJob pods stuck in `CrashLoopBackOff`
+
+Common causes:
+
+1. **Missing secrets** -- the `OPENAI_API_KEY` or Gmail credentials are not
+   configured. Check `kubectl -n email-pipeline get secrets`.
+2. **Missing resume** -- the CronJob expects a resume at
+   `/app/resumes/resume.json`. Copy it into the PVC first.
+3. **PVC not bound** -- check `kubectl -n email-pipeline get pvc` to ensure
+   all volumes are bound.
+
+### Streamlit UI pod not ready
+
+The Deployment has readiness and liveness probes on port 8502. If the pod is
+not becoming ready:
+
+1. Check logs: `kubectl -n email-pipeline logs deploy/email-pipeline-ui`
+2. Verify the Streamlit extra is installed in the image (`pip install ".[ui]"`)
+3. Ensure the port matches (8502 in both the container and the probe)
+
+---
+
 ## Data issues
 
 ### `JSONDecodeError` when reading artifacts

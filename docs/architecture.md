@@ -500,6 +500,73 @@ The UI can be launched via the CLI (`email-pipeline ui`) or directly with
 
 ---
 
+## Docker and Kubernetes Deployment
+
+The project includes a `Dockerfile` and Kubernetes manifests for running the
+pipeline in a cluster.
+
+### Docker image
+
+The `Dockerfile` uses `python:3.11-slim`, installs the vendor `resume-builder`
+package and the main project with all extras (`llm`, `ui`), and sets
+`email-pipeline` as the entry point.
+
+```
+Dockerfile          # Image definition
+.dockerignore       # Excludes .git, venv, caches, credentials, artifacts
+```
+
+### Kubernetes architecture
+
+```
+┌─────────────────────────────────────────┐
+│            email-pipeline namespace      │
+│                                         │
+│  ┌──────────┐      ┌────────────────┐   │
+│  │ CronJob  │      │  Deployment    │   │
+│  │ run-all  │      │  Streamlit UI  │   │
+│  │ (every   │      │  (1 replica)   │   │
+│  │  6h)     │      └───────┬────────┘   │
+│  └────┬─────┘              │            │
+│       │              ┌─────┴──────┐     │
+│       │              │  Service   │     │
+│       │              │  :80→8502  │     │
+│       │              └────────────┘     │
+│       │                                 │
+│  ┌────┴─────────────────────────────┐   │
+│  │  Shared Volumes (PVCs)           │   │
+│  │  pipeline-data    (1Gi)          │   │
+│  │  pipeline-output  (2Gi)          │   │
+│  │  pipeline-resumes (500Mi)        │   │
+│  └──────────────────────────────────┘   │
+│                                         │
+│  ┌──────────────┐  ┌────────────────┐   │
+│  │   Secret     │  │   ConfigMap    │   │
+│  │ OPENAI_API_  │  │ filter_rules   │   │
+│  │ KEY + Gmail  │  │ questionnaire  │   │
+│  │ credentials  │  │                │   │
+│  └──────────────┘  └────────────────┘   │
+└─────────────────────────────────────────┘
+```
+
+### Manifest inventory
+
+| File | Resource | Description |
+|------|----------|-------------|
+| `k8s/namespace.yaml` | Namespace | Dedicated `email-pipeline` namespace |
+| `k8s/secrets.yaml` | Secret (x2) | `OPENAI_API_KEY` + Gmail OAuth files |
+| `k8s/configmap.yaml` | ConfigMap | Filter rules and questionnaire config |
+| `k8s/pvc.yaml` | PVC (x3) | Data, output, and resume storage |
+| `k8s/deployment.yaml` | Deployment | Streamlit UI with health probes |
+| `k8s/service.yaml` | Service | ClusterIP service for the UI |
+| `k8s/cronjob.yaml` | CronJob | Scheduled pipeline runs (every 6h) |
+| `k8s/kustomization.yaml` | Kustomization | Ties all resources together |
+
+All manifests are deployed via `kubectl apply -k k8s/`. See `k8s/README.md`
+for the full setup guide.
+
+---
+
 ## Extension points
 
 ### Add a provider

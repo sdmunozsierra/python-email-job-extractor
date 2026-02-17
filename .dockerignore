@@ -1,0 +1,16 @@
+.git
+.venv
+venv/
+__pycache__
+*.pyc
+*.egg-info
+data/
+output/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+credentials.json
+token.json
+*.docx
+k8s/
+.env

@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pipeline-config
+  namespace: email-pipeline
+  labels:
+    app.kubernetes.io/name: email-pipeline
+data:
+  # Filter rules for email classification.
+  # Customize to match your job search criteria.
+  filter_rules.json: |
+    {
+      "job_source_domains": [
+        "greenhouse.io",
+        "lever.co",
+        "workday.com",
+        "smartrecruiters.com",
+        "icims.com",
+        "ashbyhq.com",
+        "jobs.lever.co",
+        "boards.greenhouse.io"
+      ],
+      "non_job_domains": [],
+      "job_keywords": [],
+      "weak_job_keywords": [],
+      "role_title_patterns": [],
+      "promo_negative_patterns": [],
+      "transactional_patterns": [],
+      "marketing_footer_patterns": []
+    }
+
+  # Questionnaire config for automated reply composition.
+  questionnaire.json: |
+    {
+      "salary_range": "",
+      "salary_notes": "",
+      "location_preference": "",
+      "relocation_notes": "",
+      "availability": "",
+      "notice_period": "",
+      "visa_status": "",
+      "interview_process_questions": [],
+      "custom_questions": [],
+      "tone": "professional",
+      "max_length_words": 200,
+      "extra_instructions": "",
+      "include_salary": false,
+      "include_location": true,
+      "include_interview_questions": false,
+      "include_availability": true
+    }

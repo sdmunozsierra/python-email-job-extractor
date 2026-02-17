@@ -55,15 +55,22 @@ python -m resume_builder --help
 ## Project structure
 
 ```
-src/email_opportunity_pipeline/   # Main package
-  providers/                      # Email providers (Gmail, etc.)
-  filters/                        # Filter pipeline
-  extraction/                     # Opportunity extraction
-  matching/                       # Job analysis & resume matching (LLM)
-  tailoring/                      # Resume tailoring (uses vendor/resume-builder)
-  schemas/                        # JSON schemas
+Dockerfile                           # Container image definition
+.dockerignore                        # Files excluded from Docker build
+k8s/                                 # Kubernetes deployment manifests
+src/email_opportunity_pipeline/      # Main package
+  providers/                         # Email providers (Gmail, etc.)
+  filters/                           # Filter pipeline
+  extraction/                        # Opportunity extraction
+  matching/                          # Job analysis & resume matching (LLM)
+  tailoring/                         # Resume tailoring (uses vendor/resume-builder)
+  tracking/                          # Post-reply application tracking
+  correlation/                       # Opportunity correlation
+  reply/                             # Recruiter reply composition and sending
+  ui/                                # Streamlit web dashboard
+  schemas/                           # JSON schemas
 vendor/
-  resume-builder/                 # Git subtree: .docx resume generation
+  resume-builder/                    # Git subtree: .docx resume generation
 examples/
 docs/
 ```
@@ -190,6 +197,22 @@ git remote add resume-builder https://github.com/sdmunozsierra/python-resume-bui
   - Schemas: `src/email_opportunity_pipeline/schemas/`
   - Docs: `README.md`, `docs/configuration.md`
 
+## Docker and Kubernetes
+
+The `Dockerfile` and `k8s/` manifests define how the project runs in
+containers and Kubernetes clusters.
+
+- **Dockerfile** -- update if dependencies or the project layout changes.
+- **k8s/configmap.yaml** -- update if filter rules or questionnaire schema
+  changes.
+- **k8s/deployment.yaml** / **k8s/cronjob.yaml** -- update if new environment
+  variables, volumes, or CLI arguments are added.
+- **k8s/README.md** -- update if the deployment workflow changes.
+
+When adding new environment variables that are required at runtime, add them
+to both `docs/configuration.md` and the relevant K8s manifests
+(`k8s/secrets.yaml` or `k8s/deployment.yaml`).
+
 ## Documentation changes
 
 Docs live in:
@@ -199,6 +222,7 @@ Docs live in:
 - `docs/cli.md` -- CLI command reference
 - `docs/configuration.md` -- environment variables, file formats, rules
 - `docs/troubleshooting.md` -- common issues and fixes
+- `k8s/README.md` -- Kubernetes deployment guide
 - `CONTRIBUTING.md` -- this file
 
 Keep examples executable and match CLI flags exactly (see `cli.py`).
@@ -212,3 +236,4 @@ Keep examples executable and match CLI flags exactly (see `cli.py`).
 - [ ] New interfaces/models have `to_dict()` / `from_dict()` for serialization
 - [ ] `__init__.py` exports are updated for new public APIs
 - [ ] README is updated if the change is user-visible
+- [ ] K8s manifests are updated if new env vars or volumes are needed

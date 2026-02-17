@@ -11,6 +11,7 @@ This package provides a CLI (``email-pipeline``) and a Python API for:
 7. **Tailoring** resumes per job using the vendor ``resume-builder`` package
 8. **Replying** to recruiters with tailored, LLM-composed emails
 9. **Correlating** opportunities with emails, resumes, and replies in a unified view
+10. **Tracking** the post-reply application lifecycle (status, interviews, offers, outcomes)
 
 Quick start (Python API)::
 
@@ -28,6 +29,6 @@ __all__ = [
     "generate_report",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .analytics import PipelineAnalytics, generate_report
