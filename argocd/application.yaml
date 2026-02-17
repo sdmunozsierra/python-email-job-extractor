@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: email-pipeline
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: email-pipeline
+    app.kubernetes.io/part-of: email-opportunity-pipeline
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: email-pipeline
+
+  source:
+    # Replace with your actual repository URL.
+    repoURL: https://github.com/sdmunozsierra/python-email-job-extractor.git
+    targetRevision: main
+    path: k8s
+
+    # Kustomize image override — set your container registry here.
+    kustomize:
+      images:
+        - email-pipeline=<your-registry>/email-pipeline:latest
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: email-pipeline
+
+  syncPolicy:
+    automated:
+      # Automatically apply changes when the Git source diverges.
+      prune: true
+      # Revert manual drift back to the Git-declared state.
+      selfHeal: true
+    syncOptions:
+      # Create the target namespace if it does not exist.
+      - CreateNamespace=true
+      # Apply resources server-side for accurate diff detection.
+      - ServerSideApply=true
+      # Respect the resource order declared in kustomization.yaml.
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore expected runtime differences that are not meaningful drift.
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

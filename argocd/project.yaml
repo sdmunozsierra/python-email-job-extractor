@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: email-pipeline
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Email Opportunity Pipeline — Streamlit dashboard and scheduled pipeline
+
+  # Repositories this project can pull from.
+  # Replace with your actual Git repository URL.
+  sourceRepos:
+    - "https://github.com/sdmunozsierra/python-email-job-extractor.git"
+
+  # Allowed destination clusters and namespaces.
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: email-pipeline
+
+  # Cluster-scoped resources the project is allowed to manage.
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # Namespace-scoped resources the project is allowed to manage.
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: CronJob
+    - group: networking.k8s.io
+      kind: Ingress
+
+  # Deny resources that should not be managed via GitOps.
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
